@@ -398,12 +398,12 @@ function transferEmbed({ shopId, amountRaw, amountFormatted, productName, paymen
       `#credit ${codeShopId} ${codeAmount}`,
       '```',
       '**2️⃣** ألصقه وأرسله **في هذا الروم نفسه**',
-      '**3️⃣** انتظر تأكيد البروبوت (تلقائي)',
+      '**3️⃣** انتظر التأكيد التلقائي (ProBot API أو رصد الرسائل)',
       '',
       `💰 **المبلغ المطلوب:** ${formatted} <:credits:1531454322028576778>`,
       `🤖 **لـ:** <@${codeShopId}>`,
       '',
-      '⚠️ **مهم:** أرسل الأمر في هذا الروم حتى يتم رصد التحويل تلقائياً',
+      '🚀 **رصد ذكي:** البوت يستخدم ProBot API للرصد المباشر إن أمكن',
     ].join('\n'))
     .addFields(
       { name: '📱 طريقة الدفع', value: paymentName || 'ProBot Credits', inline: true },

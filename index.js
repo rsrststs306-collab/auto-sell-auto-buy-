@@ -3,6 +3,7 @@ const { Client, GatewayIntentBits, Collection, Partials, MessageFlags } = requir
 const { errorEmbed, hasAdminAccess } = require('./src/helpers');
 const { handleGuildCreate, handleButton: handleGuildControlButton, isGuildDisabled } = require('./src/guildControl');
 const { createKeepAliveServer, setupExternalPing } = require('./keep-alive');
+const { testConnection } = require('./src/probotAPI');
 const fs   = require('fs');
 const path = require('path');
 
@@ -58,10 +59,14 @@ fs.readdirSync(prefixDir)
   });
 
 // ── Ready ─────────────────────────────────────────────────────────────────
-client.once('clientReady', (c) => {
+client.once('clientReady', async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   console.log(`📦 Slash:  ${[...client.slashCommands.keys()].map((n) => `/${n}`).join(', ')}`);
   console.log(`⌨️  Prefix: ${[...client.prefixCommands.keys()].map((n) => `${PREFIX}${n}`).join(', ')}`);
+
+  // Test ProBot API connection
+  console.log('🔍 Testing ProBot API connection...');
+  await testConnection();
 
   let watchingIndex = 0;
   const updatePresence = () => {

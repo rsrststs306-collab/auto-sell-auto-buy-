@@ -9,6 +9,7 @@ const {
 } = require('discord.js');
 const { getDB } = require('../database');
 const { generateId, errorEmbed, COLOR, buildPremiumDescription, transferEmbed } = require('../helpers');
+const { monitorTransfer, testConnection } = require('../probotAPI');
 
 // How long the user has to complete each step (ms)
 const STEP_TIMEOUT   = 5 * 60 * 1000; // 5 min for menus
@@ -202,97 +203,142 @@ module.exports = {
     console.log(`   - Buyer: ${interaction.user.id} (${interaction.user.username})`);
     console.log(`   - Shop: ${SHOP_USER_ID}`);
 
+    // ── STEP 6 : Monitor for ProBot transfer using API ─────────────────────
+    // Try ProBot API first, fallback to message detection if API is not available
+    const probotApiAvailable = await testConnection();
+    
+    console.log(`🔍 Monitoring for transfer: ${interaction.user.id} → ${SHOP_USER_ID} (${priceNum} credits)`);
+    console.log(`📡 ProBot API available: ${probotApiAvailable}`);
+
     let confirmed = false;
-    try {
-      await interaction.channel.awaitMessages({
-        filter: (msg) => {
-          // Must be from ProBot
-          if (msg.author.id !== ECONOMY_BOT_ID) return false;
-
-          console.log(`📨 ProBot message detected: ${msg.content}`);
-          
-          // Get all text content from the message
-          let fullText = msg.content || '';
-          
-          // Add embed content
-          if (msg.embeds && msg.embeds.length > 0) {
-            for (const embed of msg.embeds) {
-              if (embed.description) fullText += ' ' + embed.description;
-              if (embed.title) fullText += ' ' + embed.title;
-              if (embed.fields) {
-                for (const field of embed.fields) {
-                  fullText += ' ' + field.name + ' ' + field.value;
-                }
+    
+    if (probotApiAvailable) {
+      // ── Use ProBot API for reliable detection ─────────────────────────
+      console.log('🤖 Using ProBot API for transfer detection...');
+      
+      try {
+        await new Promise((resolve, reject) => {
+          monitorTransfer(
+            interaction.user.id,
+            SHOP_USER_ID,
+            priceNum,
+            PAYMENT_TIMEOUT,
+            (transfer, error) => {
+              if (error) {
+                reject(error);
+              } else if (transfer) {
+                console.log('🎉 Transfer confirmed via ProBot API:', transfer);
+                confirmed = true;
+                resolve(transfer);
               }
-              if (embed.author && embed.author.name) fullText += ' ' + embed.author.name;
-              if (embed.footer && embed.footer.text) fullText += ' ' + embed.footer.text;
             }
-          }
-
-          console.log(`📄 Full message text: ${fullText}`);
-
-          // Convert to lowercase for case-insensitive matching
-          const textLower = fullText.toLowerCase();
-
-          // Check for amount (try different formats)
-          const hasAmount = (
-            textLower.includes(amountStr) ||
-            textLower.includes(Number(priceNum).toLocaleString()) ||
-            textLower.includes(Number(priceNum).toLocaleString('ar')) ||
-            textLower.includes(priceNum.toString())
           );
+        });
+      } catch (error) {
+        console.log('❌ ProBot API monitoring failed:', error.message);
+        // Don't return here, fall back to message detection
+      }
+    }
+    
+    if (!confirmed && !probotApiAvailable) {
+      // ── Fallback to message detection ─────────────────────────────────
+      console.log('📨 Falling back to message detection...');
+      
+      try {
+        await interaction.channel.awaitMessages({
+          filter: (msg) => {
+            // Must be from ProBot
+            if (msg.author.id !== ECONOMY_BOT_ID) return false;
 
-          // Check for buyer (multiple ways to identify)
-          const hasBuyer = (
-            fullText.includes(interaction.user.id) ||
-            fullText.includes(buyerMention) ||
-            textLower.includes(interaction.user.username.toLowerCase()) ||
-            textLower.includes(interaction.user.displayName?.toLowerCase() || '')
-          );
+            console.log(`📨 ProBot message detected: ${msg.content}`);
+            
+            // Get all text content from the message
+            let fullText = msg.content || '';
+            
+            // Add embed content
+            if (msg.embeds && msg.embeds.length > 0) {
+              for (const embed of msg.embeds) {
+                if (embed.description) fullText += ' ' + embed.description;
+                if (embed.title) fullText += ' ' + embed.title;
+                if (embed.fields) {
+                  for (const field of embed.fields) {
+                    fullText += ' ' + field.name + ' ' + field.value;
+                  }
+                }
+                if (embed.author && embed.author.name) fullText += ' ' + embed.author.name;
+                if (embed.footer && embed.footer.text) fullText += ' ' + embed.footer.text;
+              }
+            }
 
-          // Check for shop account
-          const hasShop = (
-            fullText.includes(SHOP_USER_ID) ||
-            fullText.includes(shopMention)
-          );
+            console.log(`📄 Full message text: ${fullText}`);
 
-          // Check for transfer keywords (multiple languages)
-          const isTransfer = (
-            textLower.includes('transfer') ||
-            textLower.includes('sent') ||
-            textLower.includes('credits') ||
-            textLower.includes('كريدت') ||
-            textLower.includes('حول') ||
-            textLower.includes('أرسل') ||
-            textLower.includes('نقل') ||
-            textLower.includes('تحويل') ||
-            textLower.includes('paid') ||
-            textLower.includes('payment') ||
-            textLower.includes('received')
-          );
+            // Convert to lowercase for case-insensitive matching
+            const textLower = fullText.toLowerCase();
 
-          console.log(`✅ Detection results:`);
-          console.log(`   - Has Amount (${amountStr}): ${hasAmount}`);
-          console.log(`   - Has Buyer: ${hasBuyer}`);
-          console.log(`   - Has Shop: ${hasShop}`);
-          console.log(`   - Is Transfer: ${isTransfer}`);
+            // Check for amount (try different formats)
+            const hasAmount = (
+              textLower.includes(amountStr) ||
+              textLower.includes(Number(priceNum).toLocaleString()) ||
+              textLower.includes(Number(priceNum).toLocaleString('ar')) ||
+              textLower.includes(priceNum.toString())
+            );
 
-          const isValid = hasAmount && hasBuyer && hasShop && isTransfer;
-          
-          if (isValid) {
-            console.log(`🎉 VALID TRANSFER DETECTED!`);
-          }
+            // Check for buyer (multiple ways to identify)
+            const hasBuyer = (
+              fullText.includes(interaction.user.id) ||
+              fullText.includes(buyerMention) ||
+              textLower.includes(interaction.user.username.toLowerCase()) ||
+              textLower.includes(interaction.user.displayName?.toLowerCase() || '')
+            );
 
-          return isValid;
-        },
-        max: 1,
-        time: PAYMENT_TIMEOUT,
-        errors: ['time'],
-      });
+            // Check for shop account
+            const hasShop = (
+              fullText.includes(SHOP_USER_ID) ||
+              fullText.includes(shopMention)
+            );
 
-      confirmed = true;
-    } catch (error) {
-      console.log(`❌ ProBot detection timed out or failed:`, error.message);
+            // Check for transfer keywords (multiple languages)
+            const isTransfer = (
+              textLower.includes('transfer') ||
+              textLower.includes('sent') ||
+              textLower.includes('credits') ||
+              textLower.includes('كريدت') ||
+              textLower.includes('حول') ||
+              textLower.includes('أرسل') ||
+              textLower.includes('نقل') ||
+              textLower.includes('تحويل') ||
+              textLower.includes('paid') ||
+              textLower.includes('payment') ||
+              textLower.includes('received')
+            );
+
+            console.log(`✅ Detection results:`);
+            console.log(`   - Has Amount (${amountStr}): ${hasAmount}`);
+            console.log(`   - Has Buyer: ${hasBuyer}`);
+            console.log(`   - Has Shop: ${hasShop}`);
+            console.log(`   - Is Transfer: ${isTransfer}`);
+
+            const isValid = hasAmount && hasBuyer && hasShop && isTransfer;
+            
+            if (isValid) {
+              console.log(`🎉 VALID TRANSFER DETECTED!`);
+            }
+
+            return isValid;
+          },
+          max: 1,
+          time: PAYMENT_TIMEOUT,
+          errors: ['time'],
+        });
+
+        confirmed = true;
+      } catch (error) {
+        console.log(`❌ Message detection failed:`, error.message);
+      }
+    }
+    
+    if (!confirmed) {
+      console.log(`❌ Transfer detection timed out or failed`);
       // Timed out — buyer didn't transfer in time
       await instructionsMsg.edit({
         embeds: [
@@ -301,7 +347,8 @@ module.exports = {
             .setTitle('انتهت مهلة الدفع')
             .setDescription(`<@${interaction.user.id}> لم يكمل الدفع في الوقت المحدد.\nأعد تشغيل \`/buy\` إذا كنت لا تزال ترغب في الشراء.`)
             .addFields(
-              { name: 'نصيحة', value: 'تأكد من إرسال الأمر الصحيح للبروبوت في نفس هذا الروم', inline: false }
+              { name: 'نصيحة', value: 'تأكد من إرسال الأمر الصحيح للبروبوت في نفس هذا الروم', inline: false },
+              { name: 'طريقة البحث', value: probotApiAvailable ? 'ProBot API' : 'رصد الرسائل', inline: false }
             ),
         ],
         components: [],
