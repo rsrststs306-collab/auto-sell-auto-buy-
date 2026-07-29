@@ -141,6 +141,45 @@ client.on('interactionCreate', async (interaction) => {
       return await client.slashCommands.get('ticketpanel')?.handleButton(interaction);
     }
 
+    if (interaction.isButton() && interaction.customId.startsWith('copy_command_')) {
+      // Handle copy command button
+      const userId = interaction.customId.split('_')[2];
+      if (interaction.user.id !== userId) {
+        return await interaction.reply({
+          embeds: [errorEmbed('هذا الزر مخصص للمشتري فقط.')],
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      // Extract shop ID and amount from the embed
+      const embed = interaction.message.embeds[0];
+      if (!embed || !embed.description) {
+        return await interaction.reply({
+          embeds: [errorEmbed('لم يتم العثور على معلومات الأمر.')],
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      // Extract command from code block
+      const codeMatch = embed.description.match(/```\s*([^`]+)\s*```/);
+      if (!codeMatch) {
+        return await interaction.reply({
+          embeds: [errorEmbed('لم يتم العثور على الأمر في الرسالة.')],
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      const command = codeMatch[1].trim();
+      
+      // Send the command as a message that can be easily copied
+      await interaction.reply({
+        content: `📋 **أمر التحويل:**\n\`${command}\`\n\n💡 **انسخ الأمر أعلاه وألصقه لإتمام الدفع**`,
+        flags: MessageFlags.Ephemeral,
+      });
+
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const cmd = client.slashCommands.get(interaction.commandName);

@@ -6,6 +6,8 @@ const {
   ComponentType,
   EmbedBuilder,
   MessageFlags,
+  ButtonBuilder,
+  ButtonStyle,
 } = require('discord.js');
 const { getDB } = require('../database');
 const { generateId, errorEmbed, COLOR, buildPremiumDescription, transferEmbed } = require('../helpers');
@@ -171,6 +173,15 @@ module.exports = {
     // Parse the numeric amount from the price string (e.g. "500 credits" → 500, "$5" → 5)
     const priceNum = parseFloat(itemChoice.price.replace(/[^0-9.]/g, ''));
 
+    // Create command copy button
+    const copyCommandButton = new ButtonBuilder()
+      .setCustomId(`copy_command_${interaction.user.id}_${Date.now()}`)
+      .setLabel('📋 نسخ الأمر')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('📋');
+
+    const buttonRow = new ActionRowBuilder().addComponents(copyCommandButton);
+
     const instructionsMsg = await interaction.channel.send({
       content: `<@${interaction.user.id}>`,
       embeds: [
@@ -182,6 +193,7 @@ module.exports = {
           paymentName: payChoice.name,
         }),
       ],
+      components: [buttonRow],
     });
 
     // ── STEP 6 : Simplified ProBot Transfer Detection ────────────────────────
@@ -318,7 +330,7 @@ module.exports = {
             )
             .setTimestamp()
         ],
-        components: [],
+        components: [], // Remove buttons when timed out
       });
       return;
     }
@@ -367,6 +379,7 @@ module.exports = {
           .setTimestamp(),
       ],
       content: '',
+      components: [], // Remove buttons when payment is confirmed
     });
 
     // DM the item content to the buyer
