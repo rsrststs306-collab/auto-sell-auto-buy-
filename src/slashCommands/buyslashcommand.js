@@ -182,6 +182,9 @@ module.exports = {
 
     const buttonRow = new ActionRowBuilder().addComponents(copyCommandButton);
 
+    console.log(`🔘 Created copy button with ID: copy_command_${interaction.user.id}_${Date.now()}`);
+    console.log(`👤 Button for user: ${interaction.user.username} (${interaction.user.id})`);
+
     const instructionsMsg = await interaction.channel.send({
       content: `<@${interaction.user.id}>`,
       embeds: [
@@ -195,6 +198,8 @@ module.exports = {
       ],
       components: [buttonRow],
     });
+
+    console.log(`📤 Posted transfer message with button for ${interaction.user.username}`);
 
     // ── STEP 6 : Simplified ProBot Transfer Detection ────────────────────────
     console.log(`🔍 Starting ProBot transfer detection (SIMPLIFIED MODE)...`);

@@ -103,6 +103,72 @@ client.on('guildCreate', async (guild) => {
 // ── Slash commands + button interactions ─────────────────────────────────
 client.on('interactionCreate', async (interaction) => {
   try {
+    // Debug all button interactions
+    if (interaction.isButton()) {
+      console.log(`\n🔘 ═══ BUTTON INTERACTION ═══`);
+      console.log(`👤 User: ${interaction.user.username} (${interaction.user.id})`);
+      console.log(`🆔 Custom ID: ${interaction.customId}`);
+      console.log(`📍 Channel: ${interaction.channel?.name || 'DM'} (${interaction.channelId})`);
+      console.log(`🕐 Time: ${new Date().toISOString()}`);
+    }
+
+    // Handle copy command button FIRST (highest priority)
+    if (interaction.isButton() && interaction.customId.startsWith('copy_command_')) {
+      console.log(`🔘 Copy command button clicked by ${interaction.user.username} (${interaction.user.id})`);
+      console.log(`🆔 Button customId: ${interaction.customId}`);
+      
+      // Handle copy command button
+      const userId = interaction.customId.split('_')[2];
+      console.log(`👤 Expected user ID: ${userId}, Actual user ID: ${interaction.user.id}`);
+      
+      if (interaction.user.id !== userId) {
+        console.log(`❌ User ID mismatch - button not for this user`);
+        return await interaction.reply({
+          embeds: [errorEmbed('هذا الزر مخصص للمشتري فقط.')],
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      // Extract shop ID and amount from the embed
+      const embed = interaction.message.embeds[0];
+      console.log(`📄 Embed found: ${!!embed}`);
+      console.log(`📝 Embed description: ${embed?.description?.substring(0, 100)}...`);
+      
+      if (!embed || !embed.description) {
+        console.log(`❌ No embed or description found`);
+        return await interaction.reply({
+          embeds: [errorEmbed('لم يتم العثور على معلومات الأمر.')],
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      // Extract command from code block
+      const codeMatch = embed.description.match(/```\s*([^`]+)\s*```/);
+      console.log(`🔍 Code match found: ${!!codeMatch}`);
+      console.log(`💬 Extracted command: ${codeMatch?.[1]?.trim()}`);
+      
+      if (!codeMatch) {
+        console.log(`❌ No command found in code block`);
+        return await interaction.reply({
+          embeds: [errorEmbed('لم يتم العثور على الأمر في الرسالة.')],
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      const command = codeMatch[1].trim();
+      
+      console.log(`✅ Sending command to user: ${command}`);
+      
+      // Send the command as a message that can be easily copied
+      await interaction.reply({
+        content: `📋 **أمر التحويل:**\n\`${command}\`\n\n💡 **انسخ الأمر أعلاه وألصقه لإتمام الدفع**`,
+        flags: MessageFlags.Ephemeral,
+      });
+
+      console.log(`✅ Copy command button handled successfully`);
+      return;
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('guild_control_')) {
       return await handleGuildControlButton(interaction, client);
     }
@@ -139,45 +205,6 @@ client.on('interactionCreate', async (interaction) => {
       interaction.customId === 'ticket_close'
     )) {
       return await client.slashCommands.get('ticketpanel')?.handleButton(interaction);
-    }
-
-    if (interaction.isButton() && interaction.customId.startsWith('copy_command_')) {
-      // Handle copy command button
-      const userId = interaction.customId.split('_')[2];
-      if (interaction.user.id !== userId) {
-        return await interaction.reply({
-          embeds: [errorEmbed('هذا الزر مخصص للمشتري فقط.')],
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      // Extract shop ID and amount from the embed
-      const embed = interaction.message.embeds[0];
-      if (!embed || !embed.description) {
-        return await interaction.reply({
-          embeds: [errorEmbed('لم يتم العثور على معلومات الأمر.')],
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      // Extract command from code block
-      const codeMatch = embed.description.match(/```\s*([^`]+)\s*```/);
-      if (!codeMatch) {
-        return await interaction.reply({
-          embeds: [errorEmbed('لم يتم العثور على الأمر في الرسالة.')],
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const command = codeMatch[1].trim();
-      
-      // Send the command as a message that can be easily copied
-      await interaction.reply({
-        content: `📋 **أمر التحويل:**\n\`${command}\`\n\n💡 **انسخ الأمر أعلاه وألصقه لإتمام الدفع**`,
-        flags: MessageFlags.Ephemeral,
-      });
-
-      return;
     }
 
     if (!interaction.isChatInputCommand()) return;
