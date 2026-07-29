@@ -184,130 +184,107 @@ module.exports = {
       ],
     });
 
-    // ── STEP 6 : Enhanced ProBot Transfer Detection ──────────────────────────
-    console.log(`🔍 Starting ProBot transfer detection...`);
+    // ── STEP 6 : Simplified ProBot Transfer Detection ────────────────────────
+    console.log(`🔍 Starting ProBot transfer detection (SIMPLIFIED MODE)...`);
     console.log(`   Expected: ${interaction.user.username} (${interaction.user.id}) → Shop (${SHOP_USER_ID})`);
     console.log(`   Amount: ${priceNum} credits`);
+    console.log(`   ProBot ID: ${ECONOMY_BOT_ID}`);
 
-    const amountStr = String(priceNum);
-    const buyerMention = `<@${interaction.user.id}>`;
-    const shopMention = `<@${SHOP_USER_ID}>`;
-    
     let confirmed = false;
     try {
       await interaction.channel.awaitMessages({
         filter: (msg) => {
           // Must be from ProBot (economy bot)
-          if (msg.author.id !== ECONOMY_BOT_ID) return false;
+          if (msg.author.id !== ECONOMY_BOT_ID) {
+            console.log(`❌ Message from ${msg.author.username} (${msg.author.id}) - not ProBot`);
+            return false;
+          }
 
-          console.log(`\n🤖 ProBot message detected:`);
-          console.log(`   Content: "${msg.content}"`);
-          console.log(`   Embeds: ${msg.embeds.length}`);
+          console.log(`\n🤖 ═══ PROBOT MESSAGE DETECTED ═══`);
+          console.log(`📅 Time: ${new Date().toISOString()}`);
+          console.log(`💬 Content: "${msg.content}"`);
+          console.log(`📎 Embeds: ${msg.embeds.length}`);
           
-          // Collect all text from message and embeds
+          // Get ALL text from message and embeds
           let allText = msg.content || '';
           
-          // Extract embed content
-          for (const embed of msg.embeds) {
-            if (embed.description) {
-              allText += ' ' + embed.description;
-              console.log(`   Embed Description: "${embed.description}"`);
-            }
-            if (embed.title) {
-              allText += ' ' + embed.title;
-              console.log(`   Embed Title: "${embed.title}"`);
-            }
-            if (embed.fields) {
-              for (const field of embed.fields) {
-                allText += ' ' + field.name + ' ' + field.value;
-                console.log(`   Embed Field: "${field.name}: ${field.value}"`);
+          if (msg.embeds.length > 0) {
+            console.log(`📋 Processing ${msg.embeds.length} embeds...`);
+            for (let i = 0; i < msg.embeds.length; i++) {
+              const embed = msg.embeds[i];
+              console.log(`  Embed ${i + 1}:`);
+              
+              if (embed.title) {
+                allText += ' ' + embed.title;
+                console.log(`    Title: "${embed.title}"`);
+              }
+              if (embed.description) {
+                allText += ' ' + embed.description;
+                console.log(`    Description: "${embed.description}"`);
+              }
+              if (embed.fields) {
+                for (const field of embed.fields) {
+                  allText += ' ' + field.name + ' ' + field.value;
+                  console.log(`    Field: "${field.name}" = "${field.value}"`);
+                }
+              }
+              if (embed.author?.name) {
+                allText += ' ' + embed.author.name;
+                console.log(`    Author: "${embed.author.name}"`);
+              }
+              if (embed.footer?.text) {
+                allText += ' ' + embed.footer.text;
+                console.log(`    Footer: "${embed.footer.text}"`);
               }
             }
-            if (embed.author?.name) allText += ' ' + embed.author.name;
-            if (embed.footer?.text) allText += ' ' + embed.footer.text;
           }
 
-          console.log(`   Full Text: "${allText}"`);
+          console.log(`🔤 Full Combined Text: "${allText}"`);
           
-          // Normalize text for matching
-          const textLower = allText.toLowerCase();
-          const textNumbers = allText.replace(/[^\d]/g, ''); // Extract only numbers
+          // Simple number extraction
+          const textNumbers = allText.replace(/[^\d]/g, '');
+          const expectedAmount = String(priceNum).replace(/[^\d]/g, '');
           
-          // Enhanced amount detection
-          const amountVariations = [
-            String(priceNum), // exact: "500"
-            priceNum.toFixed(0), // rounded: "500"
-            Number(priceNum).toLocaleString('en-US'), // formatted: "1,000"
-            Number(priceNum).toLocaleString('ar'), // Arabic format
-            priceNum.toString().replace(/\.0+$/, '') // remove trailing zeros
-          ];
-          
-          const hasAmount = amountVariations.some(variation => {
-            const cleanVariation = variation.replace(/[^\d]/g, '');
-            return textLower.includes(variation.toLowerCase()) || 
-                   textNumbers.includes(cleanVariation);
-          });
+          console.log(`🔢 Extracted Numbers: "${textNumbers}"`);
+          console.log(`🎯 Expected Amount: "${expectedAmount}"`);
 
-          // Enhanced buyer detection
-          const buyerVariations = [
-            interaction.user.id, // Discord ID: "123456789"
-            buyerMention, // Mention: "<@123456789>"
-            interaction.user.username.toLowerCase(), // Username: "username"
-            interaction.user.displayName?.toLowerCase() || '', // Display name
-            interaction.user.tag.toLowerCase() // Full tag: "username#1234"
-          ];
+          // Check if the expected amount appears in the text
+          const hasAmount = textNumbers.includes(expectedAmount) || allText.includes(String(priceNum));
           
-          const hasBuyer = buyerVariations.some(variation => 
-            variation && (allText.includes(variation) || textLower.includes(variation))
+          // Check for user ID (most reliable)
+          const hasUser = allText.includes(interaction.user.id);
+          
+          // Check for shop ID
+          const hasShop = allText.includes(SHOP_USER_ID);
+          
+          // Check for transfer-related words
+          const lowerText = allText.toLowerCase();
+          const hasTransferWord = (
+            lowerText.includes('transfer') || 
+            lowerText.includes('sent') || 
+            lowerText.includes('credit') ||
+            lowerText.includes('تحويل') ||
+            lowerText.includes('كريدت')
           );
 
-          // Enhanced shop detection  
-          const shopVariations = [
-            SHOP_USER_ID, // Shop ID: "987654321"
-            shopMention, // Shop mention: "<@987654321>"
-          ];
-          
-          const hasShop = shopVariations.some(variation =>
-            allText.includes(variation)
-          );
+          console.log(`\n📊 DETECTION RESULTS:`);
+          console.log(`   💰 Amount Found: ${hasAmount ? '✅' : '❌'} (looking for: ${priceNum})`);
+          console.log(`   👤 User Found: ${hasUser ? '✅' : '❌'} (looking for: ${interaction.user.id})`);
+          console.log(`   🏪 Shop Found: ${hasShop ? '✅' : '❌'} (looking for: ${SHOP_USER_ID})`);
+          console.log(`   🔄 Transfer Word: ${hasTransferWord ? '✅' : '❌'}`);
 
-          // Enhanced transfer keywords (multi-language)
-          const transferKeywords = [
-            // English
-            'transfer', 'sent', 'paid', 'gave', 'credits', 'coins',
-            'has transferred', 'has sent', 'has paid', 'has given',
-            // Arabic  
-            'تحويل', 'أرسل', 'حول', 'دفع', 'كريدت', 'نقل',
-            'تم التحويل', 'تم الإرسال', 'تم الدفع'
-          ];
+          // For now, let's be less strict - just need ProBot message with amount and user
+          const isValid = hasAmount && (hasUser || hasShop) && hasTransferWord;
           
-          const isTransfer = transferKeywords.some(keyword => 
-            textLower.includes(keyword.toLowerCase())
-          );
-
-          // Log detection results
-          console.log(`\n📊 Detection Results:`);
-          console.log(`   ✅ Amount Match: ${hasAmount}`);
-          console.log(`   ✅ Buyer Match: ${hasBuyer}`);  
-          console.log(`   ✅ Shop Match: ${hasShop}`);
-          console.log(`   ✅ Transfer Keywords: ${isTransfer}`);
-          
-          // Additional debug info
-          if (hasAmount) console.log(`   💰 Amount variations found: ${amountVariations.filter(v => textLower.includes(v.toLowerCase()))}`);
-          if (hasBuyer) console.log(`   👤 Buyer variations found: ${buyerVariations.filter(v => v && textLower.includes(v))}`);
-          if (hasShop) console.log(`   🏪 Shop variations found: ${shopVariations.filter(v => allText.includes(v))}`);
-          if (isTransfer) console.log(`   🔄 Transfer keywords found: ${transferKeywords.filter(k => textLower.includes(k.toLowerCase()))}`);
-
-          const isValidTransfer = hasAmount && hasBuyer && hasShop && isTransfer;
-          
-          if (isValidTransfer) {
-            console.log(`\n🎉 VALID TRANSFER CONFIRMED!`);
-            console.log(`   ✅ All criteria matched - proceeding with delivery`);
+          if (isValid) {
+            console.log(`\n🎉 ✅ TRANSFER CONFIRMED! ✅`);
+            console.log(`🚀 Proceeding with automatic delivery...`);
           } else {
-            console.log(`\n❌ Transfer not valid - missing criteria`);
+            console.log(`\n❌ Not a valid transfer - continuing to wait...`);
           }
-
-          return isValidTransfer;
+          
+          console.log(`═════════════════════════════════════\n`);
+          return isValid;
         },
         max: 1,
         time: PAYMENT_TIMEOUT,
@@ -315,21 +292,29 @@ module.exports = {
       });
 
       confirmed = true;
-      console.log(`\n🎯 Transfer detection SUCCESS!`);
+      console.log(`\n🎯 ✅ PAYMENT DETECTION SUCCESS! ✅`);
       
     } catch (error) {
-      console.log(`\n❌ Transfer detection FAILED: ${error.message}`);
+      console.log(`\n❌ ⏰ PAYMENT DETECTION TIMEOUT ⏰`);
+      console.log(`Error: ${error.message}`);
       
       await instructionsMsg.edit({
         embeds: [
           new EmbedBuilder()
             .setColor(COLOR.DANGER)
             .setTitle('⏰ انتهت مهلة الدفع')
-            .setDescription(`<@${interaction.user.id}> لم يتم رصد التحويل في الوقت المحدد.`)
+            .setDescription([
+              `<@${interaction.user.id}> لم يتم رصد التحويل في الوقت المحدد.`,
+              '',
+              '**🔍 للتأكد من المشكلة:**',
+              '1. تأكد من أن ProBot موجود في هذا السيرفر',
+              '2. تأكد من إرسال الأمر في **هذا الروم نفسه**',
+              '3. تأكد من أن لديك رصيد كافي',
+              '4. جرب الأمر `/testprobot` لاختبار رصد ProBot'
+            ].join('\n'))
             .addFields(
-              { name: '🔄 أعد المحاولة', value: 'قم بتشغيل `/buy` مرة أخرى', inline: false },
-              { name: '💡 نصائح مهمة', value: '• تأكد من إرسال الأمر في **هذا الروم نفسه**\n• استخدم الأمر الصحيح تماماً كما هو منسوخ\n• تأكد من وجود رصيد كافي', inline: false },
-              { name: '🤖 الأمر المطلوب', value: `\`#credit ${SHOP_USER_ID} ${String(priceNum).replace(/[,\.]/g, '')}\``, inline: false }
+              { name: '🤖 الأمر المطلوب', value: `\`#credit ${SHOP_USER_ID} ${String(priceNum).replace(/[,\.]/g, '')}\``, inline: false },
+              { name: '🔄 المحاولة مرة أخرى', value: 'استخدم `/buy` للمحاولة مرة أخرى', inline: false }
             )
             .setTimestamp()
         ],
