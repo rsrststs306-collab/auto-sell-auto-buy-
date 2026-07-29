@@ -391,27 +391,12 @@ function transferEmbed({ shopId, amountRaw, amountFormatted, productName, paymen
     .setColor('#5865F2')
     .setTitle(`<a:Loading:1531454495790207266> إتمام الشراء — ${productName || 'المنتج'}`)
     .setDescription([
-      '⚡ **خطوات الدفع - مهم جداً:**',
-      '',
-      '**1️⃣ انسخ هذا الأمر بالضبط:**',
+      '⏳ انسخ الأمر التالي وأرسله:',
       '```',
       `#credit ${codeShopId} ${codeAmount}`,
       '```',
-      '**2️⃣ ألصقه في هذا الروم بالضبط** (لا تغير شيء)',
-      '**3️⃣ اضغط Enter وانتظر تأكيد البروبوت**',
-      '**4️⃣ سيتم التسليم تلقائياً فوراً**',
-      '',
-      `💰 **المبلغ:** ${formatted} <:credits:1531454322028576778>`,
-      `🎯 **للمتجر:** <@${codeShopId}>`,
-      '',
-      '🚨 **تحذير مهم:** يجب إرسال الأمر في **هذا الروم نفسه** وإلا لن يتم الرصد!',
+      `💰 المطلوب: ${formatted} <:credits:1531454322028576778>`,
     ].join('\n'))
-    .addFields(
-      { name: '📱 طريقة الدفع', value: paymentName || 'ProBot Credits', inline: true },
-      { name: '⏰ المهلة الزمنية', value: '10 دقائق', inline: true },
-      { name: '🔄 الحالة', value: '⏳ في انتظار التحويل...', inline: false }
-    )
-    .setFooter({ text: 'البوت يراقب رسائل البروبوت تلقائياً - لا تحتاج لفعل أي شيء آخر' })
     .setTimestamp();
 }
 
