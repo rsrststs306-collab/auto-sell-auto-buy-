@@ -175,6 +175,26 @@ client.on('interactionCreate', async (interaction) => {
 
 // ── Prefix commands ───────────────────────────────────────────────────────
 client.on('messageCreate', async (message) => {
+  // Debug: Log ProBot messages to help with transfer detection
+  if (message.author.id === process.env.ECONOMY_BOT_ID || message.author.id === '567703512763334685') {
+    console.log('🤖 ProBot message detected:');
+    console.log('  Content:', message.content);
+    if (message.embeds.length > 0) {
+      console.log('  Embeds:');
+      message.embeds.forEach((embed, i) => {
+        console.log(`    Embed ${i}:`);
+        console.log(`      Title: ${embed.title}`);
+        console.log(`      Description: ${embed.description}`);
+        if (embed.fields) {
+          embed.fields.forEach((field, j) => {
+            console.log(`      Field ${j}: ${field.name} = ${field.value}`);
+          });
+        }
+      });
+    }
+    console.log('  ────────────────────────────────────');
+  }
+
   // Let awaitMessages collectors see all messages — only skip our own bot's messages
   if (message.author.id === client.user?.id) return;
   // Only process prefix commands from non-bot users

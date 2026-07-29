@@ -391,12 +391,25 @@ function transferEmbed({ shopId, amountRaw, amountFormatted, productName, paymen
     .setColor('#5865F2')
     .setTitle(`<a:Loading:1531454495790207266> إتمام الشراء — ${productName || 'المنتج'}`)
     .setDescription([
-      '⏳ انسخ الأمر التالي وأرسله:',
+      '⏳ **خطوات إكمال الشراء:**',
+      '',
+      '**1️⃣** انسخ الأمر التالي:',
       '```',
       `#credit ${codeShopId} ${codeAmount}`,
       '```',
-      `💰 المطلوب: ${formatted} <:credits:1531454322028576778>`,
+      '**2️⃣** ألصقه وأرسله **في هذا الروم نفسه**',
+      '**3️⃣** انتظر تأكيد البروبوت (تلقائي)',
+      '',
+      `💰 **المبلغ المطلوب:** ${formatted} <:credits:1531454322028576778>`,
+      `🤖 **لـ:** <@${codeShopId}>`,
+      '',
+      '⚠️ **مهم:** أرسل الأمر في هذا الروم حتى يتم رصد التحويل تلقائياً',
     ].join('\n'))
+    .addFields(
+      { name: '📱 طريقة الدفع', value: paymentName || 'ProBot Credits', inline: true },
+      { name: '⏰ مهلة الدفع', value: '10 دقائق', inline: true },
+      { name: '🔄 الحالة', value: 'في انتظار التحويل...', inline: false }
+    )
     .setTimestamp();
 }
 

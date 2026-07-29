@@ -185,45 +185,105 @@ module.exports = {
     });
 
     // ── STEP 6 : Listen for ProBot's confirmation message ─────────────────
-    // ProBot sends an embed when a credit transfer succeeds.
-    // The embed description contains the sender mention, amount, and receiver mention.
-    // Example: "<@buyerId> has transferred 500 credits to <@shopId>"
+    // ProBot sends different formats for credit transfers:
+    // Format 1: Embed with description like "User has transferred X credits to ShopUser"
+    // Format 2: Plain message with transfer details
+    // Format 3: Embed fields with transfer information
+    // Format 4: Arabic format messages
     //
-    // We watch for any message from ProBot in this channel that:
-    //   1. Is from the economy bot (ECONOMY_BOT_ID)
-    //   2. Mentions the correct amount
-    //   3. Mentions the buyer
-    //   4. Mentions the shop account
+    // We need to check multiple possible formats and be flexible with detection
 
     const amountStr = String(priceNum);
+    const buyerMention = `<@${interaction.user.id}>`;
+    const shopMention = `<@${SHOP_USER_ID}>`;
+
+    console.log(`🔍 Listening for ProBot transfer confirmation...`);
+    console.log(`   - Amount: ${amountStr}`);
+    console.log(`   - Buyer: ${interaction.user.id} (${interaction.user.username})`);
+    console.log(`   - Shop: ${SHOP_USER_ID}`);
 
     let confirmed = false;
     try {
       await interaction.channel.awaitMessages({
         filter: (msg) => {
+          // Must be from ProBot
           if (msg.author.id !== ECONOMY_BOT_ID) return false;
 
-          // Check plain content
-          const content = msg.content.toLowerCase();
+          console.log(`📨 ProBot message detected: ${msg.content}`);
+          
+          // Get all text content from the message
+          let fullText = msg.content || '';
+          
+          // Add embed content
+          if (msg.embeds && msg.embeds.length > 0) {
+            for (const embed of msg.embeds) {
+              if (embed.description) fullText += ' ' + embed.description;
+              if (embed.title) fullText += ' ' + embed.title;
+              if (embed.fields) {
+                for (const field of embed.fields) {
+                  fullText += ' ' + field.name + ' ' + field.value;
+                }
+              }
+              if (embed.author && embed.author.name) fullText += ' ' + embed.author.name;
+              if (embed.footer && embed.footer.text) fullText += ' ' + embed.footer.text;
+            }
+          }
 
-          // Check all embed descriptions and fields
-          const embedText = msg.embeds
-            .map((e) => [
-              e.description || '',
-              ...(e.fields || []).map((f) => f.name + ' ' + f.value),
-              e.title || '',
-            ].join(' '))
-            .join(' ')
-            .toLowerCase();
+          console.log(`📄 Full message text: ${fullText}`);
 
-          const fullText = content + ' ' + embedText;
+          // Convert to lowercase for case-insensitive matching
+          const textLower = fullText.toLowerCase();
 
-          const hasAmount   = fullText.includes(amountStr);
-          const hasBuyer    = fullText.includes(interaction.user.id) || fullText.includes(interaction.user.username.toLowerCase());
-          const hasShop     = fullText.includes(SHOP_USER_ID);
-          const isTransfer  = fullText.includes('transfer') || fullText.includes('sent') || fullText.includes('credits');
+          // Check for amount (try different formats)
+          const hasAmount = (
+            textLower.includes(amountStr) ||
+            textLower.includes(Number(priceNum).toLocaleString()) ||
+            textLower.includes(Number(priceNum).toLocaleString('ar')) ||
+            textLower.includes(priceNum.toString())
+          );
 
-          return hasAmount && hasBuyer && hasShop && isTransfer;
+          // Check for buyer (multiple ways to identify)
+          const hasBuyer = (
+            fullText.includes(interaction.user.id) ||
+            fullText.includes(buyerMention) ||
+            textLower.includes(interaction.user.username.toLowerCase()) ||
+            textLower.includes(interaction.user.displayName?.toLowerCase() || '')
+          );
+
+          // Check for shop account
+          const hasShop = (
+            fullText.includes(SHOP_USER_ID) ||
+            fullText.includes(shopMention)
+          );
+
+          // Check for transfer keywords (multiple languages)
+          const isTransfer = (
+            textLower.includes('transfer') ||
+            textLower.includes('sent') ||
+            textLower.includes('credits') ||
+            textLower.includes('كريدت') ||
+            textLower.includes('حول') ||
+            textLower.includes('أرسل') ||
+            textLower.includes('نقل') ||
+            textLower.includes('تحويل') ||
+            textLower.includes('paid') ||
+            textLower.includes('payment') ||
+            textLower.includes('received')
+          );
+
+          console.log(`✅ Detection results:`);
+          console.log(`   - Has Amount (${amountStr}): ${hasAmount}`);
+          console.log(`   - Has Buyer: ${hasBuyer}`);
+          console.log(`   - Has Shop: ${hasShop}`);
+          console.log(`   - Is Transfer: ${isTransfer}`);
+
+          const isValid = hasAmount && hasBuyer && hasShop && isTransfer;
+          
+          if (isValid) {
+            console.log(`🎉 VALID TRANSFER DETECTED!`);
+          }
+
+          return isValid;
         },
         max: 1,
         time: PAYMENT_TIMEOUT,
@@ -231,15 +291,20 @@ module.exports = {
       });
 
       confirmed = true;
-    } catch {
+    } catch (error) {
+      console.log(`❌ ProBot detection timed out or failed:`, error.message);
       // Timed out — buyer didn't transfer in time
       await instructionsMsg.edit({
         embeds: [
           new EmbedBuilder()
             .setColor(COLOR.DANGER)
             .setTitle('انتهت مهلة الدفع')
-            .setDescription(`<@${interaction.user.id}> لم يكمل الدفع في الوقت المحدد.\nأعد تشغيل \`/buy\` إذا كنت لا تزال ترغب في الشراء.`),
+            .setDescription(`<@${interaction.user.id}> لم يكمل الدفع في الوقت المحدد.\nأعد تشغيل \`/buy\` إذا كنت لا تزال ترغب في الشراء.`)
+            .addFields(
+              { name: 'نصيحة', value: 'تأكد من إرسال الأمر الصحيح للبروبوت في نفس هذا الروم', inline: false }
+            ),
         ],
+        components: [],
       });
       return;
     }
