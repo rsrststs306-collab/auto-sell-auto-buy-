@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, Partials, MessageFlags } = require('discord.js');
 const { errorEmbed, hasAdminAccess } = require('./src/helpers');
 const { handleGuildCreate, handleButton: handleGuildControlButton, isGuildDisabled } = require('./src/guildControl');
+const { createKeepAliveServer, setupExternalPing } = require('./keep-alive');
 const fs   = require('fs');
 const path = require('path');
 
@@ -205,4 +206,8 @@ client.on('messageCreate', async (message) => {
 });
 
 // ── Login ─────────────────────────────────────────────────────────────────
+// Start keep-alive server for 24/7 hosting
+createKeepAliveServer();
+setupExternalPing();
+
 client.login(TOKEN);
