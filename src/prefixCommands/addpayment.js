@@ -4,7 +4,7 @@ const { generateId, paymentAddedEmbed, errorEmbed, infoEmbed, hasAdminAccess } =
 
 module.exports = {
   name: 'addpayment',
-  description: 'Add a payment method. Usage: !addpayment <name> | <details>',
+  description: 'Add a payment method. Usage: !addpayment <name> | <details> | [emoji]',
 
   async execute(message, args) {
     if (!hasAdminAccess(message.author.id, message.member)) {
@@ -17,16 +17,22 @@ module.exports = {
         embeds: [
           infoEmbed(
             '📋 Usage',
-            '`!addpayment <name> | <details>`\n\n' +
-            '**Example:**\n`!addpayment PayPal | Send to: shop@email.com`',
+            '`!addpayment <name> | <details> | [emoji]`\n\n' +
+            '**Example:**\n`!addpayment PayPal | Send to: shop@email.com | 💳`\n\n' +
+            '> The optional emoji will be displayed in the payment selection. If not provided, 💳 will be used.',
           ),
         ],
       });
     }
 
-    const [name, details] = parts;
+    const [name, details, emoji = '💳'] = parts;
     const db      = await getDB();
-    const payment = { id: generateId(), name, details };
+    const payment = { 
+      id: generateId(), 
+      name, 
+      details, 
+      emoji: emoji || '💳' // Default emoji if none provided
+    };
     db.data.payments.push(payment);
     await db.write();
 

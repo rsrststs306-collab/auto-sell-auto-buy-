@@ -11,14 +11,23 @@ module.exports = {
     )
     .addStringOption((opt) =>
       opt.setName('details').setDescription('Details / address / instructions').setRequired(true)
+    )
+    .addStringOption((opt) =>
+      opt.setName('emoji').setDescription('Custom emoji to display with this payment method (e.g. 💳)').setRequired(false)
     ),
 
   async execute(interaction) {
     const name    = interaction.options.getString('name');
     const details = interaction.options.getString('details');
+    const emoji   = interaction.options.getString('emoji') ?? '💳';
 
     const db      = await getDB();
-    const payment = { id: generateId(), name, details };
+    const payment = { 
+      id: generateId(), 
+      name, 
+      details, 
+      emoji: emoji || '💳'
+    };
     db.data.payments.push(payment);
     await db.write();
 

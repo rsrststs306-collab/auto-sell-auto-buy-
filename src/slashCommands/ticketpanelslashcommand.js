@@ -8,7 +8,9 @@ const {
   ActionRowBuilder,
   ChannelType,
 } = require('discord.js');
-const { COLOR, errorEmbed } = require('../helpers');
+const { getDB } = require('../database');
+const { sendTicketFeedbackPrompt } = require('./feedbackslashcommand');
+const { COLOR, errorEmbed, successEmbed, infoEmbed, buildPremiumDescription } = require('../helpers');
 
 const STAFF_ROLE_ID = process.env.STAFF_ROLE_ID || '';
 const TICKET_CATEGORY_ID = process.env.TICKET_CATEGORY_ID || '';
@@ -18,11 +20,11 @@ function ticketButtons(type) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`ticket_open_support_${type}`)
-      .setLabel('Support')
+      .setLabel('✨ الدعم')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`ticket_open_buy_${type}`)
-      .setLabel('Buy')
+      .setLabel('🛍️ الشراء')
       .setStyle(ButtonStyle.Success),
   );
 }
@@ -31,11 +33,11 @@ function ticketControls() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('ticket_claim')
-      .setLabel('Claim Ticket')
+      .setLabel('⚡ استلام التذكرة')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('ticket_close')
-      .setLabel('Close Ticket')
+      .setLabel('🔒 إغلاق التذكرة')
       .setStyle(ButtonStyle.Danger),
   );
 }
@@ -107,25 +109,25 @@ module.exports = {
     .addStringOption((option) =>
       option
         .setName('description')
-        .setDescription('Panel text shown above the Support and Buy buttons')
+        .setDescription('النص المعروض أعلى أزرار الدعم والشراء')
         .setRequired(true)
         .setMaxLength(4000)
     )
     .addStringOption((option) =>
       option
         .setName('type')
-        .setDescription('Internal panel type used to prevent duplicate tickets')
+        .setDescription('نوع داخلي للوحة لمنع التذاكر المكررة')
         .setRequired(false)
         .setMaxLength(30)
     ),
 
   async execute(interaction) {
     if (!interaction.guild) {
-      return interaction.reply({ embeds: [errorEmbed('Ticket panels can only be sent in a server.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed('يمكن إرسال لوحات التذاكر فقط داخل السيرفر.')], flags: MessageFlags.Ephemeral });
     }
 
     if (!STAFF_ROLE_ID) {
-      return interaction.reply({ embeds: [errorEmbed('Set `STAFF_ROLE_ID` in `.env` before creating a ticket panel.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed('يرجى تعيين `STAFF_ROLE_ID` في ملف `.env` قبل إنشاء لوحة التذاكر.')], flags: MessageFlags.Ephemeral });
     }
 
     const title = interaction.options.getString('title');
@@ -137,47 +139,47 @@ module.exports = {
         new EmbedBuilder()
           .setColor(COLOR.PRIMARY)
           .setTitle(title)
-          .setDescription(description)
-          .setFooter({ text: 'Choose Support or Buy to open a private ticket.' })
+          .setDescription(buildPremiumDescription(description))
+          .setFooter({ text: 'اختر الدعم أو الشراء لفتح تذكرة خاصة وبدء رحلتك مع الخدمة المميزة.' })
           .setTimestamp(),
       ],
       components: [ticketButtons(type)],
     });
 
-    return interaction.reply({ content: 'Ticket panel sent.', flags: MessageFlags.Ephemeral });
+    return interaction.reply({ embeds: [successEmbed('تم إرسال لوحة التذاكر', 'تم إرسال لوحة التذاكر بنجاح.')], flags: MessageFlags.Ephemeral });
   },
 
   async handleButton(interaction) {
     if (!interaction.guild) {
-      return interaction.reply({ embeds: [errorEmbed('Tickets can only be opened inside a server.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed('يمكن فتح التذاكر فقط داخل السيرفر.')], flags: MessageFlags.Ephemeral });
     }
 
     if (interaction.customId === 'ticket_claim') {
       if (!isStaff(interaction)) {
-        return interaction.reply({ embeds: [errorEmbed('Only staff can claim tickets.')], flags: MessageFlags.Ephemeral });
+        return interaction.reply({ embeds: [errorEmbed('فقط الإدارة يمكنها أخذ التذاكر.')], flags: MessageFlags.Ephemeral });
       }
 
       const claimedBy = interaction.member.displayName || interaction.user.username;
       await interaction.channel.setTopic(`${interaction.channel.topic || ''} claimed-by:${interaction.user.id}`.trim()).catch(() => {});
-      return interaction.reply({ content: `📌 Ticket claimed by **${claimedBy}**.` });
+      return interaction.reply({ embeds: [successEmbed('تم أخذ التذكرة', `تم أخذ التذكرة من قبل **${claimedBy}**.`)] });
     }
 
     if (interaction.customId === 'ticket_close') {
       const { owner } = parseTicketTopic(interaction.channel.topic);
       if (!isStaff(interaction) && owner !== interaction.user.id) {
-        return interaction.reply({ embeds: [errorEmbed('Only the ticket owner or staff can close this ticket.')], flags: MessageFlags.Ephemeral });
+        return interaction.reply({ embeds: [errorEmbed('فقط صاحب التذكرة أو الإدارة يمكنهم إغلاق هذه التذكرة.')], flags: MessageFlags.Ephemeral });
       }
 
       if (!TRANSCRIPT_CHANNEL_ID) {
-        return interaction.reply({ embeds: [errorEmbed('Ticket transcripts are not configured. Set `TRANSCRIPT_CHANNEL_ID` in `.env` first.')], flags: MessageFlags.Ephemeral });
+        return interaction.reply({ embeds: [errorEmbed('لم يتم تكوين نسخ التذاكر. يرجى تعيين `TRANSCRIPT_CHANNEL_ID` في `.env` أولًا.')], flags: MessageFlags.Ephemeral });
       }
 
       const transcriptChannel = await interaction.guild.channels.fetch(TRANSCRIPT_CHANNEL_ID).catch(() => null);
       if (!transcriptChannel || !transcriptChannel.isTextBased()) {
-        return interaction.reply({ embeds: [errorEmbed('The configured `TRANSCRIPT_CHANNEL_ID` does not point to a text channel.')], flags: MessageFlags.Ephemeral });
+        return interaction.reply({ embeds: [errorEmbed('قيمة `TRANSCRIPT_CHANNEL_ID` لا تشير إلى روم نصي صالح.')], flags: MessageFlags.Ephemeral });
       }
 
-      await interaction.reply({ content: '🔒 Saving the ticket transcript and closing this ticket...' });
+      await interaction.reply({ embeds: [infoEmbed('جارٍ حفظ النسخة', 'جارٍ حفظ نسخة التذكرة وإغلاقها...')] });
 
       const transcript = await buildTranscript(interaction.channel);
       const { type } = parseTicketTopic(interaction.channel.topic);
@@ -185,16 +187,37 @@ module.exports = {
         embeds: [
           new EmbedBuilder()
             .setColor(COLOR.WARNING)
-            .setTitle('🧾 Ticket Closed')
-            .setDescription(`Transcript saved for **#${interaction.channel.name}**.`)
+            .setTitle('تم إغلاق التذكرة')
+            .setDescription(`تم حفظ النسخة الخاصة بـ **#${interaction.channel.name}**.`)
             .addFields(
-              { name: 'Type', value: type || 'unknown', inline: true },
-              { name: 'Closed by', value: `<@${interaction.user.id}>`, inline: true },
+              { name: 'النوع', value: type || 'غير معروف', inline: true },
+              { name: 'تم الإغلاق بواسطة', value: `<@${interaction.user.id}>`, inline: true },
             )
             .setTimestamp(),
         ],
         files: [{ attachment: transcript, name: `${interaction.channel.name}-transcript.txt` }],
       });
+
+      const db = await getDB();
+      const targets = [];
+
+      if (db.data.feedbackChannelId) {
+        const feedbackChannel = await interaction.guild.channels.fetch(db.data.feedbackChannelId).catch(() => null);
+        if (feedbackChannel?.isTextBased()) {
+          targets.push(feedbackChannel);
+        }
+      }
+
+      if (owner) {
+        const ownerUser = await interaction.client.users.fetch(owner).catch(() => null);
+        if (ownerUser) {
+          targets.push(ownerUser);
+        }
+      }
+
+      if (targets.length > 0) {
+        await sendTicketFeedbackPrompt(targets, owner);
+      }
 
       return interaction.channel.delete('Ticket closed').catch(() => {});
     }
@@ -211,12 +234,12 @@ module.exports = {
     });
 
     if (existing) {
-      return interaction.editReply({ content: `You already have an open ${ticketType} ticket: ${existing}` });
+      return interaction.editReply({ embeds: [errorEmbed(`لديك بالفعل تذكرة مفتوحة من النوع ${ticketType}: ${existing}`)] });
     }
 
     const staffRole = interaction.guild.roles.cache.get(STAFF_ROLE_ID);
     if (!staffRole) {
-      return interaction.editReply({ embeds: [errorEmbed('The configured `STAFF_ROLE_ID` does not exist in this server.')] });
+      return interaction.editReply({ embeds: [errorEmbed('الدور `STAFF_ROLE_ID` المحدد غير موجود في هذا السيرفر.')] });
     }
 
     const overwrites = [
@@ -248,14 +271,14 @@ module.exports = {
       embeds: [
         new EmbedBuilder()
           .setColor(ticketType === 'buy' ? COLOR.SUCCESS : COLOR.PRIMARY)
-          .setTitle(`${ticketType === 'buy' ? '🛒 Buy' : '🛠️ Support'} Ticket`)
-          .setDescription(`Welcome <@${interaction.user.id}>. A staff member will help you soon.\n\n<@&${STAFF_ROLE_ID}>`)
-          .addFields({ name: 'Opened by', value: `<@${interaction.user.id}>`, inline: true })
+          .setTitle(`${ticketType === 'buy' ? 'تذكرة شراء' : 'تذكرة دعم'} `)
+          .setDescription(`مرحبًا <@${interaction.user.id}>. سيتولى أحد أعضاء الإدارة مساعدتك قريبًا.\n\n<@&${STAFF_ROLE_ID}>`)
+          .addFields({ name: 'مفتوح من قبل', value: `<@${interaction.user.id}>`, inline: true })
           .setTimestamp(),
       ],
       components: [ticketControls()],
     });
 
-    return interaction.editReply({ content: `Your private ticket is ready: ${channel}` });
+    return interaction.editReply({ embeds: [successEmbed('التذكرة جاهزة', `تذكرتك الخاصة جاهزة: ${channel}`)] });
   },
 };

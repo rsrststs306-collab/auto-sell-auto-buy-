@@ -7,7 +7,7 @@ const {
   PermissionFlagsBits,
 } = require('discord.js');
 const { getDB } = require('./database');
-const { COLOR, errorEmbed, hasAdminAccess } = require('./helpers');
+const { COLOR, errorEmbed, hasAdminAccess, successEmbed, infoEmbed } = require('./helpers');
 
 const JOIN_LOG_CHANNEL_ID = process.env.JOIN_LOG_CHANNEL_ID || '';
 const SERVER_CONTROL_USER_IDS = new Set(
@@ -130,25 +130,35 @@ async function handleButton(interaction, client) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   if (action === 'leave') {
-    await interaction.editReply({ content: `Leaving **${guild.name}**...` });
+    await interaction.editReply({ embeds: [infoEmbed('Leaving Server', `Leaving **${guild.name}**...`)] });
     await guild.leave();
     return true;
   }
 
   if (action === 'message') {
-    const owner = await guild.fetchOwner().catch(() => null);
-    if (!owner) return interaction.editReply({ content: 'I could not fetch the server owner.' });
+    const owner = await client.users.fetch(guild.ownerId).catch((error) => {
+      console.warn(`Could not fetch owner ${guild.ownerId} for guild ${guild.id}:`, error.message || error);
+      return null;
+    });
+    if (!owner) return interaction.editReply({ embeds: [errorEmbed('I could not fetch the server owner.')] });
 
-    await owner.send(OWNER_NOTICE_MESSAGE).catch(() => null);
-    return interaction.editReply({ content: `Tried to message **${owner.user.tag}**.` });
+    try {
+      await owner.send({ content: OWNER_NOTICE_MESSAGE, allowedMentions: { parse: [] } });
+      return interaction.editReply({ embeds: [successEmbed('Message Sent', `Message sent successfully to **${owner.tag}**.`)] });
+    } catch (error) {
+      console.warn(`Could not DM owner ${owner.id} for guild ${guild.id}:`, error.message || error);
+      return interaction.editReply({
+        embeds: [errorEmbed(`I could not send a DM to **${owner.tag}**. Their DMs may be closed or they may not share a DM route with the bot.`)],
+      });
+    }
   }
 
   if (action === 'disable') {
     await setGuildDisabled(guild.id, true);
-    return interaction.editReply({ content: `The bot is now disabled in **${guild.name}**. It will ignore commands there.` });
+    return interaction.editReply({ embeds: [successEmbed('Server Disabled', `The bot is now disabled in **${guild.name}**. It will ignore commands there.`)] });
   }
 
-  return interaction.editReply({ content: 'Unknown server-control action.' });
+  return interaction.editReply({ embeds: [errorEmbed('Unknown server-control action.')] });
 }
 
 module.exports = {

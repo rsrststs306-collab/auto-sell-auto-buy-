@@ -1,19 +1,26 @@
 {
-  "name": "auto-sell-auto-buy",
+  "name": "discord-shop-bot",
   "version": "1.0.0",
-  "description": "",
+  "description": "Discord shop bot with auto-buy functionality",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "deploy": "node deploy-commands.js"
+    "dev": "node index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "dependencies": {
-    "discord.js": "^14.27.0",
-    "dotenv": "^17.4.2",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1",
     "lowdb": "^7.0.1"
-  }
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "shop",
+    "economy"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
 }

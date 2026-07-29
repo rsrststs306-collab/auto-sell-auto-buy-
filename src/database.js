@@ -15,6 +15,7 @@ async function getDB() {
     payments: [],    // { id, name, details }
     orders: [],      // { id, userId, userTag, itemId, paymentId, status, createdAt }
     disabledGuilds: [],
+    feedbackChannelId: '',
   };
 
   const dataDir = path.join(__dirname, '..', 'data');
@@ -26,6 +27,7 @@ async function getDB() {
 
   if (!db.data.orders) { db.data.orders = []; dirty = true; }
   if (!Array.isArray(db.data.disabledGuilds)) { db.data.disabledGuilds = []; dirty = true; }
+  if (typeof db.data.feedbackChannelId !== 'string') { db.data.feedbackChannelId = ''; dirty = true; }
 
   // Do not keep purchased account or key information in order history.
   for (const order of db.data.orders) {

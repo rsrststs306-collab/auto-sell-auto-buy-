@@ -8,7 +8,7 @@ const {
   MessageFlags,
 } = require('discord.js');
 const { getDB } = require('../database');
-const { generateId, errorEmbed, COLOR } = require('../helpers');
+const { generateId, errorEmbed, COLOR, buildPremiumDescription, transferEmbed } = require('../helpers');
 
 // How long the user has to complete each step (ms)
 const STEP_TIMEOUT   = 5 * 60 * 1000; // 5 min for menus
@@ -23,13 +23,13 @@ const SHOP_USER_ID   = process.env.SHOP_USER_ID || '';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('buy')
-    .setDescription('Browse the store and buy an item using ProBot credits'),
+    .setDescription('تصفح المتجر وشراء منتج باستخدام رصيد ProBot'),
 
   async execute(interaction) {
     // ── Validate config ───────────────────────────────────────────────────
     if (!SHOP_USER_ID || SHOP_USER_ID === 'YOUR_SHOP_USER_ID_HERE') {
       return interaction.reply({
-        embeds: [errorEmbed('The store is not configured yet. Ask the owner to set `SHOP_USER_ID` in the bot config.')],
+        embeds: [errorEmbed('المتجر غير مُجهز بعد. اطلب من صاحب المتجر تعيين `SHOP_USER_ID` في إعدادات البوت.', interaction.user)],
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -39,7 +39,7 @@ module.exports = {
 
     if (available.length === 0) {
       return interaction.reply({
-        embeds: [errorEmbed('The store is currently empty. Check back later!')],
+        embeds: [errorEmbed('المتجر فارغ حاليًا. يرجى العودة لاحقًا!', interaction.user)],
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -47,13 +47,14 @@ module.exports = {
     // ── STEP 1 : Pick an item ─────────────────────────────────────────────
     const itemMenu = new StringSelectMenuBuilder()
       .setCustomId(`buy_item_${interaction.id}`)
-      .setPlaceholder('🛒 Choose an item...')
+      .setPlaceholder('✨ اختر منتجًا من قائمة المتجر...')
       .addOptions(
         available.map((item) =>
           new StringSelectMenuOptionBuilder()
             .setLabel(item.name)
             .setDescription(`${item.price} credits — Stock: ${item.quantity}`)
             .setValue(item.id)
+            .setEmoji(item.emoji || '🛍️')
         )
       );
 
@@ -61,9 +62,9 @@ module.exports = {
       embeds: [
         new EmbedBuilder()
           .setColor(COLOR.PRIMARY)
-          .setTitle('🛒 Welcome to the Store')
-          .setDescription('Select the item you want to buy.')
-          .setFooter({ text: 'Menu expires in 5 minutes.' }),
+          .setTitle('✨ مرحبًا بك في المتجر')
+          .setDescription(buildPremiumDescription('اختر المنتج الذي ترغب في شرائه من بين أفضل الخيارات المتاحة لدينا.'))
+          .setFooter({ text: 'تنتهي القائمة خلال 5 دقائق.' }),
       ],
       components: [new ActionRowBuilder().addComponents(itemMenu)],
       flags: MessageFlags.Ephemeral,
@@ -84,26 +85,27 @@ module.exports = {
       itemChoice  = fresh.data.stock.find((s) => s.id === sel.values[0]);
 
       if (!itemChoice || !Array.isArray(itemChoice.contents) || itemChoice.contents.length === 0) {
-        return sel.update({ embeds: [errorEmbed('That item is out of stock.')], components: [] });
+        return sel.update({ embeds: [errorEmbed('هذا المنتج نفد من المخزون.', interaction.user)], components: [] });
       }
 
       // ── STEP 2 : Pick a payment method ───────────────────────────────
       if (fresh.data.payments.length === 0) {
         return sel.update({
-          embeds: [errorEmbed('No payment methods configured. Contact the seller.')],
+          embeds: [errorEmbed('لا توجد طرق دفع مهيأة. تواصل مع البائع.', interaction.user)],
           components: [],
         });
       }
 
       const payMenu = new StringSelectMenuBuilder()
         .setCustomId(`buy_pay_${interaction.id}`)
-        .setPlaceholder('💳 Choose a payment method...')
+        .setPlaceholder('اختر طريقة دفع...')
         .addOptions(
           fresh.data.payments.map((p) =>
             new StringSelectMenuOptionBuilder()
               .setLabel(p.name)
               .setDescription(p.details.length > 100 ? p.details.slice(0, 97) + '…' : p.details)
               .setValue(p.id)
+              .setEmoji(p.emoji || '💳')
           )
         );
 
@@ -111,12 +113,12 @@ module.exports = {
         embeds: [
           new EmbedBuilder()
             .setColor(COLOR.PRIMARY)
-            .setTitle('💳 Choose Payment Method')
+            .setTitle('💳 اختر طريقة الدفع')
             .addFields(
-              { name: '🏷️ Item',  value: itemChoice.name,  inline: true },
-              { name: '💰 Price', value: `${itemChoice.price} credits`, inline: true },
+              { name: 'المنتج', value: itemChoice.name, inline: true },
+              { name: 'السعر', value: `${itemChoice.price} credits`, inline: true },
             )
-            .setFooter({ text: 'Menu expires in 5 minutes.' }),
+            .setFooter({ text: 'تنتهي القائمة خلال 5 دقائق.' }),
         ],
         components: [new ActionRowBuilder().addComponents(payMenu)],
       });
@@ -143,7 +145,7 @@ module.exports = {
       payChoice    = fresh2.data.payments.find((p) => p.id === sel2.values[0]);
 
       if (!payChoice) {
-        return sel2.update({ embeds: [errorEmbed('That payment method no longer exists.')], components: [] });
+        return sel2.update({ embeds: [errorEmbed('هذه طريقة الدفع لم تعد موجودة.', interaction.user)], components: [] });
       }
 
       // ── STEP 4 : Show transfer instructions — NO buttons ─────────────
@@ -152,8 +154,8 @@ module.exports = {
         embeds: [
           new EmbedBuilder()
             .setColor(COLOR.SUCCESS)
-            .setTitle('✅ Got it!')
-            .setDescription('Check the channel — your payment instructions have been posted.'),
+            .setTitle('✨ تم فهم الطلب')
+            .setDescription(buildPremiumDescription('تحقق من الروم؛ تم نشر تعليمات الدفع الخاصة بك بكل دقة.')),
         ],
         components: [],
       });
@@ -172,25 +174,13 @@ module.exports = {
     const instructionsMsg = await interaction.channel.send({
       content: `<@${interaction.user.id}>`,
       embeds: [
-        new EmbedBuilder()
-          .setColor(COLOR.WARNING)
-          .setTitle('📤 Complete Your Payment')
-          .setDescription(
-            `<@${interaction.user.id}>, to receive your item please transfer **${priceNum} credits** to <@${SHOP_USER_ID}> using the command below:`
-          )
-          .addFields(
-            {
-              name: '⌨️ Run This Command',
-              value: `\`\`\`/credits <@${SHOP_USER_ID}> ${priceNum}\`\`\``,
-              inline: false,
-            },
-            { name: '🏷️ Item',            value: itemChoice.name,              inline: true  },
-            { name: '💰 Amount',          value: `${priceNum} credits`,        inline: true  },
-            { name: '💳 Payment Method',  value: payChoice.name,               inline: false },
-            { name: '📋 Details',         value: payChoice.details,            inline: false },
-          )
-          .setFooter({ text: 'Your item will be delivered automatically once the transfer is confirmed. You have 10 minutes.' })
-          .setTimestamp(),
+        transferEmbed({
+          shopId: SHOP_USER_ID,
+          amountRaw: priceNum,
+          amountFormatted: Number(priceNum).toLocaleString('en-US'),
+          productName: itemChoice.name,
+          paymentName: payChoice.name,
+        }),
       ],
     });
 
@@ -247,8 +237,8 @@ module.exports = {
         embeds: [
           new EmbedBuilder()
             .setColor(COLOR.DANGER)
-            .setTitle('⏰ Payment Timed Out')
-            .setDescription(`<@${interaction.user.id}> did not complete the payment in time.\nRun \`/buy\` again if you still want to purchase.`),
+            .setTitle('انتهت مهلة الدفع')
+            .setDescription(`<@${interaction.user.id}> لم يكمل الدفع في الوقت المحدد.\nأعد تشغيل \`/buy\` إذا كنت لا تزال ترغب في الشراء.`),
         ],
       });
       return;
@@ -262,7 +252,7 @@ module.exports = {
 
     if (!finalItem || !Array.isArray(finalItem.contents) || finalItem.contents.length === 0) {
       await instructionsMsg.edit({
-        embeds: [errorEmbed(`<@${interaction.user.id}> Your payment went through but the item just sold out. Please contact the seller for a refund.`)],
+        embeds: [errorEmbed(`<@${interaction.user.id}> تم الدفع بنجاح لكن المنتج نفد للتو. يرجى التواصل مع البائع لاسترداد المبلغ.`)],
       });
       return;
     }
@@ -288,12 +278,12 @@ module.exports = {
       embeds: [
         new EmbedBuilder()
           .setColor(COLOR.SUCCESS)
-          .setTitle('✅ Payment Confirmed — Item Delivered!')
-          .setDescription(`<@${interaction.user.id}> your item has been sent to your DMs! 🎉`)
+          .setTitle('✅ تم تأكيد الدفع وتسليم المنتج')
+          .setDescription(buildPremiumDescription(`<@${interaction.user.id}> تم إرسال المنتج إلى رسائلك الخاصة بنجاح.`))
           .addFields(
-            { name: '🏷️ Item',   value: finalItem.name,      inline: true  },
-            { name: '💰 Price',  value: `${priceNum} credits`, inline: true  },
-            { name: '🔑 Order',  value: `\`${order.id}\``,    inline: false },
+            { name: 'المنتج', value: finalItem.name, inline: true },
+            { name: 'السعر', value: `${priceNum} credits`, inline: true },
+            { name: 'رقم الطلب', value: `\`${order.id}\``, inline: false },
           )
           .setTimestamp(),
       ],
@@ -306,22 +296,27 @@ module.exports = {
         embeds: [
           new EmbedBuilder()
             .setColor(COLOR.SUCCESS)
-            .setTitle("🎉 Here's Your Item!")
-            .setDescription('Thank you for your purchase! Here is what you ordered:')
+            .setTitle('🎁 إليك المنتج')
+            .setDescription('شكرًا لشرائك! هذا ما طلبته، بصياغة مميزة واحترافية:')
             .addFields(
-              { name: '🏷️ Item',                     value: finalItem.name,                           inline: true  },
-              { name: '💰 Price',                    value: `${priceNum} credits`,                    inline: true  },
-              { name: '📦 Your Item / Key / Content', value: `\`\`\`\n${deliveredContent}\n\`\`\``, inline: false },
-              { name: '🔑 Order ID',                 value: `\`${order.id}\``,                         inline: false },
+              { name: 'المنتج', value: finalItem.name, inline: true },
+              { name: 'السعر', value: `${priceNum} credits`, inline: true },
+              { name: 'المحتوى', value: `\`\`\`\n${deliveredContent}\n\`\`\``, inline: false },
+              { name: 'معرّف الطلب', value: `\`${order.id}\``, inline: false },
             )
-            .setFooter({ text: 'Thank you for shopping with us!' })
+            .setFooter({ text: 'شكرًا لشرائك معنا!' })
             .setTimestamp(),
         ],
       });
     } catch {
       // DMs closed — post content in channel (only visible context, still public — warn about this)
       await interaction.channel.send({
-        content: `<@${interaction.user.id}> ⚠️ I couldn't DM you. Please enable DMs. Contact the seller with order ID \`${order.id}\` to receive your item.`,
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLOR.WARNING)
+            .setTitle('الرسائل الخاصة غير متاحة')
+            .setDescription(buildPremiumDescription(`<@${interaction.user.id}> لم أتمكن من إرسال الرسالة الخاصة إليك. يرجى تفعيل الرسائل الخاصة والتواصل مع البائع باستخدام رقم الطلب \`${order.id}\` لاستلام المنتج.`)),
+        ],
       });
     }
   },

@@ -11,7 +11,7 @@ const {
   TextInputStyle,
 } = require('discord.js');
 const { getDB } = require('../database');
-const { errorEmbed, COLOR } = require('../helpers');
+const { errorEmbed, successEmbed, COLOR } = require('../helpers');
 
 const MAX_BUTTON_ITEMS = 25;
 
@@ -21,6 +21,17 @@ function splitEntries(content) {
 
 function isAdmin(interaction) {
   return interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+}
+
+async function downloadFileContent(attachment) {
+  try {
+    const response = await fetch(attachment.url);
+    if (!response.ok) throw new Error('Failed to download file');
+    const content = await response.text();
+    return content;
+  } catch (error) {
+    throw new Error(`Failed to read file: ${error.message}`);
+  }
 }
 
 async function sendStockPanel(interaction) {
@@ -46,8 +57,11 @@ async function sendStockPanel(interaction) {
   }
 
   const description = [
-    'Choose an item below to add account information, keys, or other content.',
-    'Use one entry per line, or separate entries with `|`.',
+    '🔸 **Manual Entry:** Choose an item below and enter account details in the modal',
+    '🔸 **File Upload:** Use `/addstock id:<item_id> file:<accounts.txt>`',
+    '🔸 **Direct Text:** Use `/addstock id:<item_id> content:<account_details>`',
+    '',
+    'Supported file formats: `.txt`, `.csv` - One account per line',
     items.length < db.data.stock.length ? `Only the first ${MAX_BUTTON_ITEMS} items are shown. Use the direct command for the rest.` : '',
   ].filter(Boolean).join('\n');
 
@@ -55,7 +69,7 @@ async function sendStockPanel(interaction) {
     embeds: [
       new EmbedBuilder()
         .setColor(COLOR.PRIMARY)
-        .setTitle('📦 Stock Management')
+        .setTitle('إدارة المخزون')
         .setDescription(description)
         .addFields(items.map((item) => ({
           name: item.name,
@@ -69,17 +83,27 @@ async function sendStockPanel(interaction) {
   });
 }
 
-async function addStockEntries(interaction, itemId, content, quantity) {
+async function addStockEntries(interaction, itemId, content, quantity, isFromFile = false) {
   const db = await getDB();
   const item = db.data.stock.find((entry) => entry.id === itemId);
 
   if (!item) {
-    return interaction.reply({ embeds: [errorEmbed(`No item found with ID \`${itemId}\`.`)], flags: MessageFlags.Ephemeral });
+    return interaction.reply({ embeds: [errorEmbed(`No item found with ID \`${itemId}\`.`, interaction.user)], flags: MessageFlags.Ephemeral });
   }
 
   const entries = splitEntries(content);
-  if (entries.length === 0 || !Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
-    return interaction.reply({ embeds: [errorEmbed('Enter valid content and a quantity from 1 to 100.')], flags: MessageFlags.Ephemeral });
+  if (entries.length === 0) {
+    return interaction.reply({ 
+      embeds: [errorEmbed('No valid content found. Make sure your text or file contains account details.', interaction.user)], 
+      flags: MessageFlags.Ephemeral 
+    });
+  }
+
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+    return interaction.reply({ 
+      embeds: [errorEmbed('Quantity must be between 1 and 100.', interaction.user)], 
+      flags: MessageFlags.Ephemeral 
+    });
   }
 
   if (!Array.isArray(item.contents)) item.contents = [];
@@ -88,17 +112,17 @@ async function addStockEntries(interaction, itemId, content, quantity) {
   await db.write();
 
   const added = entries.length * quantity;
+  const sourceText = isFromFile ? 'from uploaded file' : 'manually';
+  
   return interaction.reply({
     embeds: [
-      new EmbedBuilder()
-        .setColor(COLOR.SUCCESS)
-        .setTitle('✅ Stock Added')
-        .addFields(
-          { name: '🏷️ Item', value: item.name, inline: true },
-          { name: '📦 Added', value: `${added} entr${added === 1 ? 'y' : 'ies'}`, inline: true },
-          { name: '📊 Total Stock', value: `${item.contents.length} entries`, inline: true },
-        )
-        .setTimestamp(),
+      successEmbed(
+        '✅ Stock Added Successfully',
+        `Added **${added} entries** to **${item.name}** ${sourceText}\n\n` +
+        `**Total Stock:** ${item.contents.length} entries\n` +
+        `**Item ID:** \`${item.id}\``,
+        interaction.user
+      )
     ],
     flags: MessageFlags.Ephemeral,
   });
@@ -107,13 +131,18 @@ async function addStockEntries(interaction, itemId, content, quantity) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('addstock')
-    .setDescription('Open the stock panel or add account/key entries directly')
+    .setDescription('Add account entries to an item - via text, file upload, or interactive panel')
     .addStringOption((opt) =>
       opt.setName('id').setDescription('Item ID (leave empty to open the stock panel)').setRequired(false)
     )
     .addStringOption((opt) =>
       opt.setName('content')
         .setDescription('Account info; use one account per line for multiple accounts')
+        .setRequired(false)
+    )
+    .addAttachmentOption((opt) =>
+      opt.setName('file')
+        .setDescription('Upload a .txt or .csv file containing account details (one per line)')
         .setRequired(false)
     )
     .addIntegerOption((opt) =>
@@ -125,28 +154,93 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    const itemId  = interaction.options.getString('id');
-    const content = interaction.options.getString('content');
-    const quantity = interaction.options.getInteger('quantity') ?? 1;
-
-    if (!itemId && !content) return sendStockPanel(interaction);
-    if (!itemId || !content) {
-      return interaction.reply({ embeds: [errorEmbed('Provide both `id` and `content`, or leave both empty to open the stock panel.')], flags: MessageFlags.Ephemeral });
+    if (!isAdmin(interaction)) {
+      return interaction.reply({ 
+        embeds: [errorEmbed('You need **Administrator** permission to add stock.', interaction.user)], 
+        flags: MessageFlags.Ephemeral 
+      });
     }
 
-    return addStockEntries(interaction, itemId, content, quantity);
+    const itemId     = interaction.options.getString('id');
+    const content    = interaction.options.getString('content');
+    const file       = interaction.options.getAttachment('file');
+    const quantity   = interaction.options.getInteger('quantity') ?? 1;
+
+    // If no parameters provided, show the stock panel
+    if (!itemId && !content && !file) {
+      return sendStockPanel(interaction);
+    }
+
+    // Validate that we have an item ID
+    if (!itemId) {
+      return interaction.reply({ 
+        embeds: [errorEmbed('You must provide an `id` when adding content or uploading a file.', interaction.user)], 
+        flags: MessageFlags.Ephemeral 
+      });
+    }
+
+    // Handle file upload
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['.txt', '.csv'];
+      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+      
+      if (!allowedTypes.includes(fileExtension)) {
+        return interaction.reply({
+          embeds: [errorEmbed(`Invalid file type. Please upload a \`.txt\` or \`.csv\` file.\n\nUploaded: \`${file.name}\``, interaction.user)],
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      // Check file size (Discord limit is 8MB, but we'll be more conservative)
+      if (file.size > 1024 * 1024) { // 1MB limit
+        return interaction.reply({
+          embeds: [errorEmbed('File too large. Please upload files smaller than 1MB.', interaction.user)],
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      try {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        
+        const fileContent = await downloadFileContent(file);
+        
+        if (!fileContent.trim()) {
+          return interaction.editReply({
+            embeds: [errorEmbed('The uploaded file is empty or contains no readable content.', interaction.user)],
+          });
+        }
+
+        return addStockEntries(interaction, itemId, fileContent, quantity, true);
+      } catch (error) {
+        return interaction.editReply({
+          embeds: [errorEmbed(`Failed to process file: ${error.message}`, interaction.user)],
+        });
+      }
+    }
+
+    // Handle text content
+    if (content) {
+      return addStockEntries(interaction, itemId, content, quantity, false);
+    }
+
+    // If we get here, something went wrong
+    return interaction.reply({ 
+      embeds: [errorEmbed('Please provide either `content` text or upload a `file` with account details.', interaction.user)], 
+      flags: MessageFlags.Ephemeral 
+    });
   },
 
   async handleButton(interaction) {
     if (!interaction.customId.startsWith('addstock_item_')) return;
     if (!isAdmin(interaction)) {
-      return interaction.reply({ embeds: [errorEmbed('You need **Administrator** permission to add stock.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed('You need **Administrator** permission to add stock.', interaction.user)], flags: MessageFlags.Ephemeral });
     }
 
     const itemId = interaction.customId.slice('addstock_item_'.length);
     const db = await getDB();
     const item = db.data.stock.find((entry) => entry.id === itemId);
-    if (!item) return interaction.reply({ embeds: [errorEmbed('That stock item no longer exists.')], flags: MessageFlags.Ephemeral });
+    if (!item) return interaction.reply({ embeds: [errorEmbed('That stock item no longer exists.', interaction.user)], flags: MessageFlags.Ephemeral });
 
     const modal = new ModalBuilder()
       .setCustomId(`addstock_modal_${itemId}`)
@@ -157,7 +251,7 @@ module.exports = {
             .setCustomId('content')
             .setLabel('Account info or key (one per line)')
             .setStyle(TextInputStyle.Paragraph)
-            .setPlaceholder('email1:password1\nemail2:password2')
+            .setPlaceholder('email1:password1\nemail2:password2\nOR\nsteam_key_1\nsteam_key_2')
             .setRequired(true)
             .setMaxLength(4000)
         ),
@@ -178,12 +272,12 @@ module.exports = {
   async handleModal(interaction) {
     if (!interaction.customId.startsWith('addstock_modal_')) return;
     if (!isAdmin(interaction)) {
-      return interaction.reply({ embeds: [errorEmbed('You need **Administrator** permission to add stock.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed('You need **Administrator** permission to add stock.', interaction.user)], flags: MessageFlags.Ephemeral });
     }
 
     const itemId = interaction.customId.slice('addstock_modal_'.length);
     const content = interaction.fields.getTextInputValue('content');
     const quantity = Number.parseInt(interaction.fields.getTextInputValue('quantity'), 10);
-    return addStockEntries(interaction, itemId, content, quantity);
+    return addStockEntries(interaction, itemId, content, quantity, false);
   },
 };

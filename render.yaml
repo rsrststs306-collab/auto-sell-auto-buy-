@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: discord-shop-bot
+    env: node
+    buildCommand: npm install
+    startCommand: node .
+    envVars:
+      - key: NODE_ENV
+        value: production

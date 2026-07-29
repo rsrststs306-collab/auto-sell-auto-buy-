@@ -19,6 +19,9 @@ module.exports = {
       opt.setName('content')
         .setDescription('First account, key, or item information to deliver after purchase')
         .setRequired(false)
+    )
+    .addStringOption((opt) =>
+      opt.setName('emoji').setDescription('Custom emoji to display with this item (e.g. 🎮)').setRequired(false)
     ),
 
   async execute(interaction) {
@@ -26,9 +29,18 @@ module.exports = {
     const price       = interaction.options.getString('price');
     const description = interaction.options.getString('description') ?? '';
     const content     = interaction.options.getString('content');
+    const emoji       = interaction.options.getString('emoji') ?? '🛍️';
 
     const db   = await getDB();
-    const item = { id: generateId(), name, description, price, contents: content ? [content] : [], quantity: content ? 1 : 0 };
+    const item = { 
+      id: generateId(), 
+      name, 
+      description, 
+      price, 
+      contents: content ? [content] : [], 
+      quantity: content ? 1 : 0,
+      emoji: emoji || '🛍️'
+    };
     db.data.stock.push(item);
     await db.write();
 
@@ -36,14 +48,14 @@ module.exports = {
       embeds: [
         new EmbedBuilder()
           .setColor(COLOR.SUCCESS)
-          .setTitle('✅ Item Created')
-          .setDescription(`**${name}** has been added to the store.\nUse \`/addstock\` or \`!addstock\` to add more individual content entries (accounts, keys, etc.)`)
+          .setTitle('تم إنشاء المنتج')
+          .setDescription(`تمت إضافة **${item.emoji} ${name}** إلى المتجر.\nاستخدم \`/addstock\` أو \`!addstock\` لإضافة المزيد من المحتويات (الحسابات أو المفاتيح أو غيرها).`)
           .addFields(
-            { name: '🏷️ Name',        value: name,              inline: true  },
-            { name: '💰 Price',       value: price,             inline: true  },
+            { name: '🏷️ Name',        value: `${item.emoji} ${name}`,      inline: true  },
+            { name: '💰 Price',       value: price,                        inline: true  },
             { name: '📊 Stock',       value: `${item.contents.length} entr${item.contents.length === 1 ? 'y' : 'ies'}`, inline: true },
-            { name: '📝 Description', value: description || 'N/A', inline: false },
-            { name: '🔑 ID',          value: `\`${item.id}\``,   inline: false },
+            { name: '📝 Description', value: description || 'N/A',         inline: false },
+            { name: '🔑 ID',          value: `\`${item.id}\``,              inline: false },
           )
           .setTimestamp(),
       ],

@@ -116,8 +116,16 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
+    if (interaction.isButton() && interaction.customId.startsWith('feedback_')) {
+      return await client.slashCommands.get('feedback')?.handleButton(interaction);
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('addstock_item_')) {
       return await client.slashCommands.get('addstock')?.handleButton(interaction);
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId === 'feedback_modal') {
+      return await client.slashCommands.get('feedback')?.handleModal(interaction);
     }
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('addstock_modal_')) {
