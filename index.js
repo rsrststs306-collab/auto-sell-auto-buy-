@@ -3,7 +3,6 @@ const { Client, GatewayIntentBits, Collection, Partials, MessageFlags } = requir
 const { errorEmbed, hasAdminAccess } = require('./src/helpers');
 const { handleGuildCreate, handleButton: handleGuildControlButton, isGuildDisabled } = require('./src/guildControl');
 const { createKeepAliveServer, setupExternalPing } = require('./keep-alive');
-const { testConnection } = require('./src/probotAPI');
 const fs   = require('fs');
 const path = require('path');
 
@@ -63,10 +62,6 @@ client.once('clientReady', async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   console.log(`📦 Slash:  ${[...client.slashCommands.keys()].map((n) => `/${n}`).join(', ')}`);
   console.log(`⌨️  Prefix: ${[...client.prefixCommands.keys()].map((n) => `${PREFIX}${n}`).join(', ')}`);
-
-  // Test ProBot API connection
-  console.log('🔍 Testing ProBot API connection...');
-  await testConnection();
 
   let watchingIndex = 0;
   const updatePresence = () => {
@@ -180,24 +175,46 @@ client.on('interactionCreate', async (interaction) => {
 
 // ── Prefix commands ───────────────────────────────────────────────────────
 client.on('messageCreate', async (message) => {
-  // Debug: Log ProBot messages to help with transfer detection
+  // Enhanced ProBot message logging for debugging
   if (message.author.id === process.env.ECONOMY_BOT_ID || message.author.id === '567703512763334685') {
-    console.log('🤖 ProBot message detected:');
-    console.log('  Content:', message.content);
+    console.log('\n🔍 ═══ PROBOT MESSAGE DETECTED ═══');
+    console.log(`📅 Time: ${new Date().toISOString()}`);
+    console.log(`📍 Channel: ${message.channel.name} (${message.channel.id})`);
+    console.log(`💬 Content: "${message.content}"`);
+    
     if (message.embeds.length > 0) {
-      console.log('  Embeds:');
+      console.log(`📎 Embeds (${message.embeds.length}):`);
       message.embeds.forEach((embed, i) => {
-        console.log(`    Embed ${i}:`);
-        console.log(`      Title: ${embed.title}`);
-        console.log(`      Description: ${embed.description}`);
-        if (embed.fields) {
+        console.log(`  📋 Embed ${i + 1}:`);
+        if (embed.title) console.log(`    🏷️ Title: "${embed.title}"`);
+        if (embed.description) console.log(`    📝 Description: "${embed.description}"`);
+        if (embed.author?.name) console.log(`    👤 Author: "${embed.author.name}"`);
+        if (embed.footer?.text) console.log(`    🔻 Footer: "${embed.footer.text}"`);
+        if (embed.fields && embed.fields.length > 0) {
+          console.log(`    📋 Fields (${embed.fields.length}):`);
           embed.fields.forEach((field, j) => {
-            console.log(`      Field ${j}: ${field.name} = ${field.value}`);
+            console.log(`      ${j + 1}. ${field.name}: ${field.value}`);
           });
         }
       });
     }
-    console.log('  ────────────────────────────────────');
+    
+    // Check if this looks like a transfer message
+    const fullText = [
+      message.content,
+      ...message.embeds.flatMap(e => [e.title, e.description, e.author?.name, e.footer?.text].filter(Boolean)),
+      ...message.embeds.flatMap(e => e.fields?.map(f => `${f.name} ${f.value}`) || [])
+    ].join(' ').toLowerCase();
+    
+    const hasTransferKeywords = ['transfer', 'sent', 'credits', 'تحويل', 'كريدت'].some(keyword => 
+      fullText.includes(keyword.toLowerCase())
+    );
+    
+    if (hasTransferKeywords) {
+      console.log('🎯 POTENTIAL TRANSFER MESSAGE DETECTED!');
+    }
+    
+    console.log('═══════════════════════════════════════\n');
   }
 
   // Let awaitMessages collectors see all messages — only skip our own bot's messages
