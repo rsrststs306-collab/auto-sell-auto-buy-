@@ -34,20 +34,47 @@ function loadEmbeds() {
   }
 
   try {
-    const files = fs.readdirSync(embedsDir).filter(file => file.endsWith('.json'));
+    // Get all files recursively, not just root level
+    function getAllJsonFiles(dir) {
+      const files = [];
+      const items = fs.readdirSync(dir, { withFileTypes: true });
+      
+      for (const item of items) {
+        const fullPath = path.join(dir, item.name);
+        
+        if (item.isDirectory()) {
+          // Skip common non-embed directories
+          if (!['node_modules', '.git', 'scripts', 'src'].includes(item.name)) {
+            files.push(...getAllJsonFiles(fullPath));
+          }
+        } else if (item.name.endsWith('.json') && !item.name.startsWith('.') && !item.name.includes('package')) {
+          files.push(fullPath);
+        }
+      }
+      
+      return files;
+    }
     
-    for (const file of files) {
+    const jsonFiles = getAllJsonFiles(embedsDir);
+    
+    for (const filePath of jsonFiles) {
       try {
-        const filePath = path.join(embedsDir, file);
         const fileContent = fs.readFileSync(filePath, 'utf8');
         const embedData = JSON.parse(fileContent);
         
-        const fileName = path.basename(file, '.json');
-        embedCache[fileName] = embedData;
+        // Get relative path for the key
+        const relativePath = path.relative(embedsDir, filePath);
+        const fileName = path.basename(relativePath, '.json');
         
-        console.log(`✅ Loaded embeds from ${file}`);
+        // If it's in a subdirectory, include that in the name
+        const dirName = path.dirname(relativePath);
+        const fileKey = dirName !== '.' ? `${dirName.replace(/[\\\/]/g, '_')}_${fileName}` : fileName;
+        
+        embedCache[fileKey] = embedData;
+        
+        console.log(`✅ Loaded embeds from ${relativePath}`);
       } catch (error) {
-        console.error(`❌ Error loading embed file ${file}:`, error.message);
+        console.error(`❌ Error loading embed file ${filePath}:`, error.message);
       }
     }
     

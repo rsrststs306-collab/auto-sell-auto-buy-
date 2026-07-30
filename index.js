@@ -117,8 +117,17 @@ client.on('interactionCreate', async (interaction) => {
       console.log(`🔘 Copy command button clicked by ${interaction.user.username} (${interaction.user.id})`);
       console.log(`🆔 Button customId: ${interaction.customId}`);
       
-      // Handle copy command button
-      const userId = interaction.customId.split('_')[2];
+      // Extract user ID from button ID: copy_command_USER_ID
+      const parts = interaction.customId.split('_');
+      if (parts.length < 3) {
+        console.log(`❌ Invalid button ID format: ${interaction.customId}`);
+        return await interaction.reply({
+          embeds: [errorEmbed('خطأ في معرف الزر.')],
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      
+      const userId = parts[2]; // Get the user ID part
       console.log(`👤 Expected user ID: ${userId}, Actual user ID: ${interaction.user.id}`);
       
       if (interaction.user.id !== userId) {
@@ -132,7 +141,6 @@ client.on('interactionCreate', async (interaction) => {
       // Extract shop ID and amount from the embed
       const embed = interaction.message.embeds[0];
       console.log(`📄 Embed found: ${!!embed}`);
-      console.log(`📝 Embed description: ${embed?.description?.substring(0, 100)}...`);
       
       if (!embed || !embed.description) {
         console.log(`❌ No embed or description found`);
@@ -142,10 +150,10 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
-      // Extract command from code block
-      const codeMatch = embed.description.match(/```\s*([^`]+)\s*```/);
+      // Extract command from code block in description
+      console.log(`📝 Searching in embed description: ${embed.description.substring(0, 200)}...`);
+      const codeMatch = embed.description.match(/```(?:\w+)?\s*([^`]+)\s*```/);
       console.log(`🔍 Code match found: ${!!codeMatch}`);
-      console.log(`💬 Extracted command: ${codeMatch?.[1]?.trim()}`);
       
       if (!codeMatch) {
         console.log(`❌ No command found in code block`);
@@ -156,12 +164,11 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       const command = codeMatch[1].trim();
-      
-      console.log(`✅ Sending command to user: ${command}`);
+      console.log(`✅ Extracted command: ${command}`);
       
       // Send the command as a message that can be easily copied
       await interaction.reply({
-        content: `📋 **أمر التحويل:**\n\`${command}\`\n\n💡 **انسخ الأمر أعلاه وألصقه لإتمام الدفع**`,
+        content: `📋 **أمر التحويل:**\n\`${command}\`\n\n💡 **انسخ الأمر أعلاه وألصقه في ProBot لإتمام الدفع**\n🤖 تأكد من إرسال الأمر في **هذا الروم نفسه** حتى يتمكن البوت من رصد التحويل`,
         flags: MessageFlags.Ephemeral,
       });
 

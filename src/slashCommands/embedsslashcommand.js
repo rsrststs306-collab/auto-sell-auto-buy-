@@ -1,10 +1,11 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { getEmbed, getErrorEmbed, listAvailableEmbeds, reloadEmbeds } = require('../dynamicEmbeds');
+const { listAvailableEmbeds, reloadEmbeds, getEmbed } = require('../dynamicEmbeds');
+const { hasAdminAccess } = require('../helpers');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('embeds')
-    .setDescription('Manage dynamic embeds')
+    .setDescription('Manage dynamic embeds system')
     .addSubcommand(subcommand =>
       subcommand
         .setName('list')
@@ -13,11 +14,11 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('test')
-        .setDescription('Test an embed')
+        .setDescription('Test a specific embed')
         .addStringOption(option =>
           option
             .setName('file')
-            .setDescription('Embed file name (without .json)')
+            .setDescription('Embed file name (e.g., shop, errors)')
             .setRequired(true)
         )
         .addStringOption(option =>
@@ -25,6 +26,12 @@ module.exports = {
             .setName('name')
             .setDescription('Embed name within the file')
             .setRequired(true)
+        )
+        .addStringOption(option =>
+          option
+            .setName('variables')
+            .setDescription('Variables in JSON format: {"key":"value"}')
+            .setRequired(false)
         )
     )
     .addSubcommand(subcommand =>
@@ -36,112 +43,146 @@ module.exports = {
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
 
+    if (subcommand === 'reload' && !hasAdminAccess(interaction.user.id, interaction.member)) {
+      return await interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('❌ صلاحيات غير كافية')
+            .setDescription('تحتاج إلى صلاحية **Administrator** لاستخدام هذا الأمر.')
+            .setColor('#ff4d6d')
+        ],
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
     if (subcommand === 'list') {
-      const availableEmbeds = listAvailableEmbeds();
+      const embedsList = listAvailableEmbeds();
       
-      if (Object.keys(availableEmbeds).length === 0) {
+      if (Object.keys(embedsList).length === 0) {
         return await interaction.reply({
-          embeds: [getErrorEmbed('No embed files found. Add JSON files to the /embeds folder.')],
-          flags: MessageFlags.Ephemeral
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('📋 لا توجد embeds')
+              .setDescription('لم يتم العثور على أي ملفات embeds في مجلد `/embeds`')
+              .setColor('#ffc857')
+          ],
+          flags: MessageFlags.Ephemeral,
         });
       }
 
-      let description = '**📋 Available Embeds:**\n\n';
+      let description = '**📁 الملفات المتاحة:**\n\n';
+      let totalEmbeds = 0;
       
-      for (const [fileName, embedNames] of Object.entries(availableEmbeds)) {
-        description += `**📁 ${fileName}.json**\n`;
-        for (const embedName of embedNames) {
-          description += `  • \`${embedName}\`\n`;
-        }
-        description += '\n';
+      for (const [fileName, embeds] of Object.entries(embedsList)) {
+        totalEmbeds += embeds.length;
+        description += `**${fileName}.json** (${embeds.length} embeds)\n`;
+        const embedNames = embeds.slice(0, 5).map(name => `\`${name}\``).join(', ');
+        description += `└ ${embedNames}${embeds.length > 5 ? ` وأكثر...` : ''}\n\n`;
       }
 
-      description += '**💡 Usage:** `/embeds test file:filename name:embedname`';
-
-      await interaction.reply({
+      return await interaction.reply({
         embeds: [
           new EmbedBuilder()
-            .setTitle('🎨 Dynamic Embeds System')
+            .setTitle('📋 قائمة Embeds المتاحة')
             .setDescription(description)
-            .setColor('#6c63ff')
             .addFields(
               {
-                name: '📝 How to Add Embeds',
-                value: '1. Create a `.json` file in the `embeds/` folder\n2. Add your embed definitions\n3. Use `/embeds reload` to refresh\n4. Test with `/embeds test`',
-                inline: false
+                name: '📊 الإحصائيات',
+                value: `**${Object.keys(embedsList).length}** ملف\n**${totalEmbeds}** embed`,
+                inline: true
               },
               {
-                name: '🔧 Variable Support',
-                value: 'Use `{variable}` in your embeds for dynamic content:\n`{user}`, `{item}`, `{price}`, `{amount}`, etc.',
-                inline: false
+                name: '🔧 الاستخدام',
+                value: 'استخدم `/embeds test` لاختبار embed معين',
+                inline: true
               }
             )
+            .setColor('#7b61ff')
             .setTimestamp()
         ],
-        flags: MessageFlags.Ephemeral
+        flags: MessageFlags.Ephemeral,
       });
     }
 
     else if (subcommand === 'test') {
       const fileName = interaction.options.getString('file');
       const embedName = interaction.options.getString('name');
+      const variablesStr = interaction.options.getString('variables');
+
+      let variables = {};
+      if (variablesStr) {
+        try {
+          variables = JSON.parse(variablesStr);
+        } catch (error) {
+          return await interaction.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle('❌ خطأ في المتغيرات')
+                .setDescription('تنسيق JSON غير صحيح. مثال: `{"user":"<@123>","amount":"1000"}`')
+                .setColor('#ff4d6d')
+            ],
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+      }
 
       try {
-        const testEmbed = getEmbed(fileName, embedName, {
-          user: `<@${interaction.user.id}>`,
-          username: interaction.user.username,
-          server: interaction.guild?.name || 'Test Server',
-          channel: interaction.channel?.name || 'test-channel',
-          item: 'Test Item',
-          price: '500',
-          amount: '500 credits',
-          command: '#credit 123456789 500',
-          shop: '<@123456789>',
-          order: 'TEST123',
-          content: 'Test content here',
-          quantity: '10',
-          count: '5'
-        }, interaction.user);
-
+        const testEmbed = getEmbed(fileName, embedName, variables, interaction.user);
+        
         await interaction.reply({
-          content: `🧪 **Testing embed:** \`${fileName}.json\` → \`${embedName}\``,
+          content: `🧪 **اختبار Embed:** \`${fileName}/${embedName}\``,
           embeds: [testEmbed],
-          flags: MessageFlags.Ephemeral
+          flags: MessageFlags.Ephemeral,
         });
+
       } catch (error) {
-        await interaction.reply({
-          embeds: [getErrorEmbed(`Failed to test embed: ${error.message}`)],
-          flags: MessageFlags.Ephemeral
+        return await interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('❌ فشل في اختبار Embed')
+              .setDescription(`لم يتم العثور على \`${embedName}\` في ملف \`${fileName}\``)
+              .setColor('#ff4d6d')
+          ],
+          flags: MessageFlags.Ephemeral,
         });
       }
     }
 
     else if (subcommand === 'reload') {
       try {
-        const embedData = reloadEmbeds();
-        const fileCount = Object.keys(embedData).length;
-        let totalEmbeds = 0;
-        
-        for (const file in embedData) {
-          totalEmbeds += Object.keys(embedData[file]).length;
-        }
+        const embeds = reloadEmbeds();
+        const totalFiles = Object.keys(embeds).length;
+        const totalEmbeds = Object.values(embeds).reduce((sum, file) => sum + Object.keys(file).length, 0);
 
         await interaction.reply({
           embeds: [
             new EmbedBuilder()
-              .setTitle('✅ Embeds Reloaded')
-              .setDescription(`Successfully reloaded ${fileCount} files with ${totalEmbeds} embeds.`)
+              .setTitle('🔄 تم إعادة تحميل Embeds')
+              .setDescription([
+                '✅ تم إعادة تحميل جميع ملفات Embeds بنجاح',
+                '',
+                `📁 **الملفات:** ${totalFiles}`,
+                `📋 **Embeds:** ${totalEmbeds}`,
+                '',
+                '💡 يمكن الآن استخدام الـ embeds المحدثة في جميع الأوامر'
+              ].join('\n'))
               .setColor('#2ecc71')
               .setTimestamp()
           ],
-          flags: MessageFlags.Ephemeral
+          flags: MessageFlags.Ephemeral,
         });
+
       } catch (error) {
         await interaction.reply({
-          embeds: [getErrorEmbed(`Failed to reload embeds: ${error.message}`)],
-          flags: MessageFlags.Ephemeral
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('❌ فشل في إعادة التحميل')
+              .setDescription(`خطأ: ${error.message}`)
+              .setColor('#ff4d6d')
+          ],
+          flags: MessageFlags.Ephemeral,
         });
       }
     }
-  }
+  },
 };
