@@ -302,17 +302,8 @@ module.exports = {
             }
           }
           
-          // If no exact match, check if any reasonable amount is present
-          if (!hasAmount) {
-            const foundNumbers = allText.match(/\d+/g) || [];
-            console.log(`🔍 All numbers found in message:`, foundNumbers);
-            
-            // Accept any transfer as long as other conditions are met (user and transfer words)
-            if (foundNumbers.length > 0) {
-              hasAmount = true;
-              console.log(`✅ Accepting any amount transfer for flexibility`);
-            }
-          }
+          // Only accept if we have transfer words AND proper amount
+          // Don't accept just any numbers!
           
           // Check for user ID (most reliable) - handle both <@userid> and <@!userid> formats
           const hasUser = (
@@ -328,14 +319,22 @@ module.exports = {
             allText.includes(`<@!${SHOP_USER_ID}>`)
           );
           
-          // Check for transfer-related words
+          // Check for transfer-related words (must be successful transfer, not just any ProBot message)
           const lowerText = allText.toLowerCase();
           const hasTransferWord = (
-            lowerText.includes('transfer') || 
-            lowerText.includes('sent') || 
-            lowerText.includes('credit') ||
-            lowerText.includes('تحويل') ||
-            lowerText.includes('كريدت')
+            (lowerText.includes('transfer') && (lowerText.includes('has transferred') || lowerText.includes('تم التحويل'))) ||
+            (lowerText.includes('sent') && (lowerText.includes('successfully sent') || lowerText.includes('تم الإرسال'))) ||
+            (lowerText.includes('credit') && (lowerText.includes('transferred') || lowerText.includes('received'))) ||
+            lowerText.includes('تحويل كريدت') ||
+            lowerText.includes('تم التحويل')
+          );
+          
+          // Additional check: must NOT be a confirmation request or fee message
+          const isConfirmationRequest = (
+            lowerText.includes('type these numbers to confirm') ||
+            lowerText.includes('transfer fees') ||
+            lowerText.includes('أكتب هذه الأرقام') ||
+            lowerText.includes('رسوم التحويل')
           );
 
           console.log(`\n📊 DETECTION RESULTS:`);
@@ -343,15 +342,17 @@ module.exports = {
           console.log(`   👤 User Found: ${hasUser ? '✅' : '❌'} (looking for: ${interaction.user.id})`);
           console.log(`   🏪 Shop Found: ${hasShop ? '✅' : '❌'} (looking for: ${SHOP_USER_ID})`);
           console.log(`   🔄 Transfer Word: ${hasTransferWord ? '✅' : '❌'}`);
+          console.log(`   ❌ Is Confirmation Request: ${isConfirmationRequest ? '❌' : '✅'}`);
 
-          // For now, let's be less strict - just need ProBot message with amount and user
-          const isValid = hasAmount && (hasUser || hasShop) && hasTransferWord;
+          // Must have ALL conditions AND NOT be a confirmation request
+          const isValid = hasAmount && hasUser && hasShop && hasTransferWord && !isConfirmationRequest;
           
           if (isValid) {
             console.log(`\n🎉 ✅ TRANSFER CONFIRMED! ✅`);
             console.log(`🚀 Proceeding with automatic delivery...`);
           } else {
             console.log(`\n❌ Not a valid transfer - continuing to wait...`);
+            console.log(`   Missing: ${!hasAmount ? 'Amount ' : ''}${!hasUser ? 'User ' : ''}${!hasShop ? 'Shop ' : ''}${!hasTransferWord ? 'TransferWord ' : ''}`);
           }
           
           console.log(`═════════════════════════════════════\n`);

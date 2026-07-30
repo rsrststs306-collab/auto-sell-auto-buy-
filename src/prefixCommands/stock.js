@@ -250,11 +250,7 @@ module.exports = {
             }
           }
           
-          // If no exact match, accept any amount for flexibility
-          if (!hasAmount && /\d+/.test(raw)) {
-            hasAmount = true;
-            console.log(`✅ Accepting any amount transfer for flexibility`);
-          }
+          // Don't accept just any amount - be stricter
           
           // Improved user detection (handle mention formats)
           const hasBuyer = (
@@ -272,11 +268,19 @@ module.exports = {
           );
           
           const isTransfer = (
-            lowerText.includes('transfer') || 
-            lowerText.includes('sent') || 
-            lowerText.includes('credits') ||
-            lowerText.includes('تحويل') ||
-            lowerText.includes('كريدت')
+            (lowerText.includes('transfer') && (lowerText.includes('has transferred') || lowerText.includes('تم التحويل'))) ||
+            (lowerText.includes('sent') && (lowerText.includes('successfully sent') || lowerText.includes('تم الإرسال'))) ||
+            (lowerText.includes('credit') && (lowerText.includes('transferred') || lowerText.includes('received'))) ||
+            lowerText.includes('تحويل كريدت') ||
+            lowerText.includes('تم التحويل')
+          );
+          
+          // Additional check: must NOT be a confirmation request or fee message
+          const isConfirmationRequest = (
+            lowerText.includes('type these numbers to confirm') ||
+            lowerText.includes('transfer fees') ||
+            lowerText.includes('أكتب هذه الأرقام') ||
+            lowerText.includes('رسوم التحويل')
           );
           
           console.log(`📊 DETECTION RESULTS:`);
@@ -284,13 +288,16 @@ module.exports = {
           console.log(`   👤 User Found: ${hasBuyer ? '✅' : '❌'}`);
           console.log(`   🏪 Shop Found: ${hasShop ? '✅' : '❌'}`);
           console.log(`   🔄 Transfer Word: ${isTransfer ? '✅' : '❌'}`);
+          console.log(`   ❌ Is Confirmation Request: ${isConfirmationRequest ? '❌' : '✅'}`);
           
-          const result = hasAmount && (hasBuyer || hasShop) && isTransfer;
+          // Must have ALL conditions AND NOT be a confirmation request
+          const result = hasAmount && hasBuyer && hasShop && isTransfer && !isConfirmationRequest;
           
           if (result) {
             console.log(`\n🎉 ✅ TRANSFER CONFIRMED! ✅`);
           } else {
             console.log(`\n❌ Not a valid transfer - continuing to wait...`);
+            console.log(`   Missing: ${!hasAmount ? 'Amount ' : ''}${!hasBuyer ? 'Buyer ' : ''}${!hasShop ? 'Shop ' : ''}${!isTransfer ? 'TransferWord ' : ''}`);
           }
           
           console.log(`═════════════════════════════════════\n`);
