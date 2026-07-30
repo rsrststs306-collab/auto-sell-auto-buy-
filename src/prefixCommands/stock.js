@@ -196,6 +196,17 @@ module.exports = {
     }
 
     const priceNum = parseFloat(String(itemChoice.price).replace(/[^0-9.]/g, '')) || 0;
+    
+    // Create command copy button
+    const buttonId = `copy_command_${message.author.id}`;
+    const copyCommandButton = new ButtonBuilder()
+      .setCustomId(buttonId)
+      .setLabel('📋 نسخ الأمر')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('📋');
+
+    const buttonRow = new ActionRowBuilder().addComponents(copyCommandButton);
+    
     const instructionsMsg = await message.channel.send({
       content: `<@${message.author.id}>`,
       embeds: [
@@ -207,6 +218,7 @@ module.exports = {
           paymentName: payChoice.name
         })
       ],
+      components: [buttonRow],
     });
 
     console.log(`🔍 Starting ProBot transfer detection for ${message.author.username}...`);
