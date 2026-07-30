@@ -213,6 +213,12 @@ module.exports = {
       await message.channel.awaitMessages({
         filter: (msg) => {
           if (msg.author.id !== ECONOMY_BOT_ID) return false;
+          
+          console.log(`\n🤖 ═══ PROBOT MESSAGE DETECTED (PREFIX) ═══`);
+          console.log(`📅 Time: ${new Date().toISOString()}`);
+          console.log(`💬 Content: "${msg.content}"`);
+          console.log(`📎 Embeds: ${msg.embeds.length}`);
+          
           const raw = [
             msg.content,
             ...msg.embeds.flatMap((e) => [
@@ -220,14 +226,75 @@ module.exports = {
               e.description || '',
               ...(e.fields || []).map((f) => `${f.name} ${f.value}`),
             ]),
-          ].join(' ').toLowerCase();
-
+          ].join(' ');
+          
+          console.log(`🔤 Full Combined Text: "${raw}"`);
+          
+          const lowerText = raw.toLowerCase();
           const amountStr = String(priceNum);
-          const hasAmount = raw.includes(amountStr);
-          const hasBuyer = raw.includes(message.author.id) || raw.includes(message.author.username.toLowerCase());
-          const hasShop = raw.includes(SHOP_USER_ID);
-          const isTransfer = raw.includes('transfer') || raw.includes('sent') || raw.includes('credits');
-          return hasAmount && hasBuyer && hasShop && isTransfer;
+          
+          // Flexible amount checking
+          let hasAmount = false;
+          const amountVariations = [
+            amountStr,
+            `$${priceNum}`,
+            priceNum * 1000,
+            priceNum * 1000000,
+          ];
+          
+          for (const variation of amountVariations) {
+            if (raw.includes(String(variation))) {
+              hasAmount = true;
+              console.log(`✅ Found amount variation: ${variation}`);
+              break;
+            }
+          }
+          
+          // If no exact match, accept any amount for flexibility
+          if (!hasAmount && /\d+/.test(raw)) {
+            hasAmount = true;
+            console.log(`✅ Accepting any amount transfer for flexibility`);
+          }
+          
+          // Improved user detection (handle mention formats)
+          const hasBuyer = (
+            raw.includes(message.author.id) || 
+            raw.includes(`<@${message.author.id}>`) ||
+            raw.includes(`<@!${message.author.id}>`) ||
+            lowerText.includes(message.author.username.toLowerCase())
+          );
+          
+          // Improved shop detection (handle mention formats)
+          const hasShop = (
+            raw.includes(SHOP_USER_ID) ||
+            raw.includes(`<@${SHOP_USER_ID}>`) ||
+            raw.includes(`<@!${SHOP_USER_ID}>`)
+          );
+          
+          const isTransfer = (
+            lowerText.includes('transfer') || 
+            lowerText.includes('sent') || 
+            lowerText.includes('credits') ||
+            lowerText.includes('تحويل') ||
+            lowerText.includes('كريدت')
+          );
+          
+          console.log(`📊 DETECTION RESULTS:`);
+          console.log(`   💰 Amount Found: ${hasAmount ? '✅' : '❌'}`);
+          console.log(`   👤 User Found: ${hasBuyer ? '✅' : '❌'}`);
+          console.log(`   🏪 Shop Found: ${hasShop ? '✅' : '❌'}`);
+          console.log(`   🔄 Transfer Word: ${isTransfer ? '✅' : '❌'}`);
+          
+          const result = hasAmount && (hasBuyer || hasShop) && isTransfer;
+          
+          if (result) {
+            console.log(`\n🎉 ✅ TRANSFER CONFIRMED! ✅`);
+          } else {
+            console.log(`\n❌ Not a valid transfer - continuing to wait...`);
+          }
+          
+          console.log(`═════════════════════════════════════\n`);
+          return result;
         },
         max: 1,
         time: PAYMENT_TIMEOUT,

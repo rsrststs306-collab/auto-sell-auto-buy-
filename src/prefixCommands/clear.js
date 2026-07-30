@@ -21,9 +21,9 @@ module.exports = {
 
     const messages = await message.channel.bulkDelete(amount, true).catch(() => null);
     if (!messages) {
-      return message.reply({ embeds: [errorEmbed('I could not delete those messages. They may be older than 14 days.')] });
+      return message.channel.send({ embeds: [errorEmbed('I could not delete those messages. They may be older than 14 days.')] });
     }
 
-    await message.reply({ embeds: [successEmbed('🧹 Messages Deleted', `${messages.size} message(s) removed from this channel.`)] }).then((reply) => setTimeout(() => reply.delete().catch(() => {}), 4000));
+    await message.channel.send({ embeds: [successEmbed('🧹 Messages Deleted', `${messages.size} message(s) removed from this channel.`)] }).then((reply) => setTimeout(() => reply.delete().catch(() => {}), 4000));
   },
 };

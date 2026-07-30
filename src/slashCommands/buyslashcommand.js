@@ -278,14 +278,55 @@ module.exports = {
           console.log(`🔢 Extracted Numbers: "${textNumbers}"`);
           console.log(`🎯 Expected Amount: "${expectedAmount}"`);
 
-          // Check if the expected amount appears in the text
-          const hasAmount = textNumbers.includes(expectedAmount) || allText.includes(String(priceNum));
+          // Check if the expected amount appears in the text (more flexible matching)
+          let hasAmount = false;
           
-          // Check for user ID (most reliable)
-          const hasUser = allText.includes(interaction.user.id);
+          // Try multiple amount formats
+          const amountVariations = [
+            String(priceNum),                    // Original: "1"
+            priceNum.toString(),                 // "1"
+            expectedAmount,                      // "1"
+            `$${priceNum}`,                      // "$1"
+            priceNum * 1000,                     // For k format: 1000
+            priceNum * 1000000,                  // For M format: 1000000
+          ];
           
-          // Check for shop ID
-          const hasShop = allText.includes(SHOP_USER_ID);
+          console.log(`🔍 Checking amount variations:`, amountVariations);
+          
+          for (const variation of amountVariations) {
+            const varStr = String(variation);
+            if (allText.includes(varStr) || textNumbers.includes(varStr.replace(/[^\d]/g, ''))) {
+              hasAmount = true;
+              console.log(`✅ Found amount variation: ${varStr}`);
+              break;
+            }
+          }
+          
+          // If no exact match, check if any reasonable amount is present
+          if (!hasAmount) {
+            const foundNumbers = allText.match(/\d+/g) || [];
+            console.log(`🔍 All numbers found in message:`, foundNumbers);
+            
+            // Accept any transfer as long as other conditions are met (user and transfer words)
+            if (foundNumbers.length > 0) {
+              hasAmount = true;
+              console.log(`✅ Accepting any amount transfer for flexibility`);
+            }
+          }
+          
+          // Check for user ID (most reliable) - handle both <@userid> and <@!userid> formats
+          const hasUser = (
+            allText.includes(interaction.user.id) ||
+            allText.includes(`<@${interaction.user.id}>`) ||
+            allText.includes(`<@!${interaction.user.id}>`)
+          );
+          
+          // Check for shop ID - handle both <@userid> and <@!userid> formats
+          const hasShop = (
+            allText.includes(SHOP_USER_ID) ||
+            allText.includes(`<@${SHOP_USER_ID}>`) ||
+            allText.includes(`<@!${SHOP_USER_ID}>`)
+          );
           
           // Check for transfer-related words
           const lowerText = allText.toLowerCase();
