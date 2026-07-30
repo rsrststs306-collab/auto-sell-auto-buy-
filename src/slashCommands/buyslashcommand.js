@@ -231,7 +231,6 @@ module.exports = {
     
     try {
       const result = await interaction.channel.awaitMessages({
-      await interaction.channel.awaitMessages({
         filter: (msg) => {
           try {
             // Must be from ProBot (economy bot)
