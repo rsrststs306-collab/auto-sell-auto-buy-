@@ -34,13 +34,21 @@ module.exports = {
       .setCustomId(`stock_item_${interaction.id}`)
       .setPlaceholder('⚡✨🎯 اختر منتجًا لعرض التفاصيل')
       .addOptions(
-        stock.slice(0, 25).map((item, index) =>
-          new StringSelectMenuOptionBuilder()
+        stock.slice(0, 25).map((item, index) => {
+          const option = new StringSelectMenuOptionBuilder()
             .setLabel(item.name)
             .setDescription(`${item.price} • ${Array.isArray(item.contents) ? item.contents.length : (item.quantity ?? 0)} in stock`)
-            .setValue(item.id)
-            .setEmoji(item.emoji || getStockItemEmoji(index))
-        )
+            .setValue(item.id);
+          
+          // Only set emoji if it exists and is not null/undefined
+          if (item.emoji && item.emoji.trim()) {
+            option.setEmoji(item.emoji);
+          } else {
+            option.setEmoji(getStockItemEmoji(index));
+          }
+          
+          return option;
+        })
       );
 
     await interaction.reply({
@@ -133,11 +141,17 @@ module.exports = {
       .addOptions(
         payments.map((pay) => {
           const details = String(pay.details || 'No details');
-          return new StringSelectMenuOptionBuilder()
+          const option = new StringSelectMenuOptionBuilder()
             .setLabel(pay.name)
             .setDescription(details.length > 100 ? details.slice(0, 97) + '…' : details)
-            .setValue(pay.id)
-            .setEmoji(pay.emoji || '💳');
+            .setValue(pay.id);
+          
+          // Only set emoji if it exists and is not null/undefined
+          if (pay.emoji && pay.emoji.trim()) {
+            option.setEmoji(pay.emoji);
+          }
+          
+          return option;
         })
       );
 

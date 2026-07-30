@@ -51,13 +51,19 @@ module.exports = {
       .setCustomId(`buy_item_${interaction.id}`)
       .setPlaceholder('✨ اختر منتجًا من قائمة المتجر...')
       .addOptions(
-        available.map((item) =>
-          new StringSelectMenuOptionBuilder()
+        available.map((item) => {
+          const option = new StringSelectMenuOptionBuilder()
             .setLabel(item.name)
             .setDescription(`${item.price} credits — Stock: ${item.quantity}`)
-            .setValue(item.id)
-            .setEmoji(item.emoji || '🛍️')
-        )
+            .setValue(item.id);
+          
+          // Only set emoji if it exists and is not null/undefined
+          if (item.emoji && item.emoji.trim()) {
+            option.setEmoji(item.emoji);
+          }
+          
+          return option;
+        })
       );
 
     await interaction.reply({
@@ -102,13 +108,19 @@ module.exports = {
         .setCustomId(`buy_pay_${interaction.id}`)
         .setPlaceholder('اختر طريقة دفع...')
         .addOptions(
-          fresh.data.payments.map((p) =>
-            new StringSelectMenuOptionBuilder()
+          fresh.data.payments.map((p) => {
+            const option = new StringSelectMenuOptionBuilder()
               .setLabel(p.name)
               .setDescription(p.details.length > 100 ? p.details.slice(0, 97) + '…' : p.details)
-              .setValue(p.id)
-              .setEmoji(p.emoji || '💳')
-          )
+              .setValue(p.id);
+            
+            // Only set emoji if it exists and is not null/undefined
+            if (p.emoji && p.emoji.trim()) {
+              option.setEmoji(p.emoji);
+            }
+            
+            return option;
+          })
         );
 
       await sel.update({
