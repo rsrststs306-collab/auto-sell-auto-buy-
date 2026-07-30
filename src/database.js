@@ -1,59 +1,80 @@
-const { JSONFilePreset } = require('lowdb/node');
+const fs = require('fs').promises;
 const path = require('path');
-const fs = require('fs');
 
-let db;
+// Path to the JSON database file
+const DB_PATH = path.join(__dirname, '..', 'data', 'db.json');
 
-async function getDB() {
-  if (db) return db;
+// Default database structure
+const defaultData = {
+  stock: [],
+  payments: [],
+  orders: [],
+  disabledGuilds: [],
+  feedbackChannelId: "",
+  config: {
+    roles: {},
+    channels: {},
+    categories: {},
+    shop: {}
+  }
+};
 
-  const defaultData = {
-    // Each item: { id, name, description, price, contents: [] }
-    // contents = array of strings — each is one deliverable (key, account info, etc.)
-    // quantity is always contents.length — no separate field needed
-    stock: [],
-    payments: [],    // { id, name, details }
-    orders: [],      // { id, userId, userTag, itemId, paymentId, status, createdAt }
-    disabledGuilds: [],
-    feedbackChannelId: '',
-  };
+class JSONDatabase {
+  constructor() {
+    this.data = null;
+  }
 
-  const dataDir = path.join(__dirname, '..', 'data');
-  fs.mkdirSync(dataDir, { recursive: true });
-  db = await JSONFilePreset(path.join(dataDir, 'db.json'), defaultData);
-
-  // ── Migrations ────────────────────────────────
-  let dirty = false;
-
-  if (!db.data.orders) { db.data.orders = []; dirty = true; }
-  if (!Array.isArray(db.data.disabledGuilds)) { db.data.disabledGuilds = []; dirty = true; }
-  if (typeof db.data.feedbackChannelId !== 'string') { db.data.feedbackChannelId = ''; dirty = true; }
-
-  // Do not keep purchased account or key information in order history.
-  for (const order of db.data.orders) {
-    if (Object.prototype.hasOwnProperty.call(order, 'deliveredContent')) {
-      delete order.deliveredContent;
-      dirty = true;
+  async load() {
+    try {
+      const fileContent = await fs.readFile(DB_PATH, 'utf8');
+      this.data = JSON.parse(fileContent);
+      
+      // Ensure all required properties exist
+      this.data = { ...defaultData, ...this.data };
+      
+      // Ensure nested objects exist
+      if (!this.data.config) this.data.config = {};
+      this.data.config = { ...defaultData.config, ...this.data.config };
+      
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        // File doesn't exist, create with default data
+        console.log('Database file not found, creating new one...');
+        this.data = { ...defaultData };
+        await this.write();
+      } else {
+        console.error('Error loading database:', error);
+        throw error;
+      }
     }
   }
 
-  // Migrate old items that have a single `content` string → contents array
-  for (const item of db.data.stock) {
-    if (!Array.isArray(item.contents)) {
-      item.contents = item.content ? [item.content] : [];
-      delete item.content;
-      dirty = true;
-    }
-
-    if (item.quantity !== item.contents.length) {
-      item.quantity = item.contents.length;
-      dirty = true;
+  async write() {
+    try {
+      // Ensure the data directory exists
+      const dataDir = path.dirname(DB_PATH);
+      await fs.mkdir(dataDir, { recursive: true });
+      
+      // Write the data to the file with pretty formatting
+      await fs.writeFile(DB_PATH, JSON.stringify(this.data, null, 2), 'utf8');
+    } catch (error) {
+      console.error('Error writing database:', error);
+      throw error;
     }
   }
-
-  if (dirty) await db.write();
-
-  return db;
 }
 
-module.exports = { getDB };
+// Singleton instance
+let dbInstance = null;
+
+async function getDB() {
+  if (!dbInstance) {
+    dbInstance = new JSONDatabase();
+    await dbInstance.load();
+  }
+  return dbInstance;
+}
+
+module.exports = {
+  getDB
+};
