@@ -15,7 +15,12 @@ const { errorEmbed, successEmbed, COLOR } = require('../helpers');
 
 const MAX_BUTTON_ITEMS = 25;
 
-function splitEntries(content) {
+function splitEntries(content, itemType = 'account') {
+  if (itemType === 'cookies') {
+    // For cookies, treat the entire content as one entry
+    return [content.trim()].filter(Boolean);
+  }
+  // For accounts, split by lines as before
   return content.split(/\r?\n|\s*\|\s*/).map((entry) => entry.trim()).filter(Boolean);
 }
 
@@ -61,7 +66,11 @@ async function sendStockPanel(interaction) {
     '🔸 **File Upload:** Use `/addstock id:<item_id> file:<accounts.txt>`',
     '🔸 **Direct Text:** Use `/addstock id:<item_id> content:<account_details>`',
     '',
-    'Supported file formats: `.txt`, `.csv` - One account per line',
+    '**Item Types:**',
+    '👤 **Account:** Each line = 1 account (email:password)',
+    '🍪 **Cookies:** Entire content = 1 account (cookie data)',
+    '',
+    'Supported file formats: `.txt`, `.csv`',
     items.length < db.data.stock.length ? `Only the first ${MAX_BUTTON_ITEMS} items are shown. Use the direct command for the rest.` : '',
   ].filter(Boolean).join('\n');
 
@@ -72,8 +81,8 @@ async function sendStockPanel(interaction) {
         .setTitle('إدارة المخزون')
         .setDescription(description)
         .addFields(items.map((item) => ({
-          name: item.name,
-          value: `${Array.isArray(item.contents) ? item.contents.length : 0} available • ID: \`${item.id}\``,
+          name: `${item.type === 'cookies' ? '🍪' : '👤'} ${item.name}`,
+          value: `${Array.isArray(item.contents) ? item.contents.length : 0} available • Type: ${item.type === 'cookies' ? 'Cookies' : 'Accounts'} • ID: \`${item.id}\``,
           inline: true,
         })))
         .setTimestamp(),
@@ -91,7 +100,10 @@ async function addStockEntries(interaction, itemId, content, quantity, isFromFil
     return interaction.reply({ embeds: [errorEmbed(`No item found with ID \`${itemId}\`.`, interaction.user)], flags: MessageFlags.Ephemeral });
   }
 
-  const entries = splitEntries(content);
+  // Get item type (default to 'account' for backward compatibility)
+  const itemType = item.type || 'account';
+  
+  const entries = splitEntries(content, itemType);
   if (entries.length === 0) {
     return interaction.reply({ 
       embeds: [errorEmbed('No valid content found. Make sure your text or file contains account details.', interaction.user)], 
@@ -113,12 +125,14 @@ async function addStockEntries(interaction, itemId, content, quantity, isFromFil
 
   const added = entries.length * quantity;
   const sourceText = isFromFile ? 'from uploaded file' : 'manually';
+  const typeText = itemType === 'cookies' ? 'cookie set(s)' : 'account(s)';
   
   return interaction.reply({
     embeds: [
       successEmbed(
         '✅ Stock Added Successfully',
-        `Added **${added} entries** to **${item.name}** ${sourceText}\n\n` +
+        `Added **${added} ${typeText}** to **${item.name}** ${sourceText}\n\n` +
+        `**Item Type:** ${itemType === 'cookies' ? '🍪 Cookies' : '👤 Accounts'}\n` +
         `**Total Stock:** ${item.contents.length} entries\n` +
         `**Item ID:** \`${item.id}\``,
         interaction.user
@@ -249,9 +263,13 @@ module.exports = {
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId('content')
-            .setLabel('Account info or key (one per line)')
+            .setLabel(item.type === 'cookies' ? 'Cookie Data (entire content = 1 account)' : 'Account Info (one per line)')
             .setStyle(TextInputStyle.Paragraph)
-            .setPlaceholder('email1:password1\nemail2:password2\nOR\nsteam_key_1\nsteam_key_2')
+            .setPlaceholder(
+              item.type === 'cookies' 
+                ? 'Paste your cookie data here...\n(The entire content will be treated as ONE account)'
+                : 'email1:password1\nemail2:password2\nOR\nsteam_key_1\nsteam_key_2'
+            )
             .setRequired(true)
             .setMaxLength(4000)
         ),
