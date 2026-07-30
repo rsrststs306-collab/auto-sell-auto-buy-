@@ -219,16 +219,26 @@ module.exports = {
     console.log(`   Expected: ${interaction.user.username} (${interaction.user.id}) → Shop (${SHOP_USER_ID})`);
     console.log(`   Amount: ${priceNum} credits`);
     console.log(`   ProBot ID: ${ECONOMY_BOT_ID}`);
+    console.log(`⏰ WAITING FOR PAYMENT - PRODUCT NOT DELIVERED YET`);
+    console.log(`🎯 User must transfer ${priceNum} credits to ${SHOP_USER_ID}`);
+    console.log(`⏱️ Will wait up to ${PAYMENT_TIMEOUT / 1000} seconds for ProBot confirmation...`);
+    
+    // Add a small delay to ensure the user has time to see the message
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     let confirmed = false;
+    console.log(`🕐 Starting awaitMessages with ${PAYMENT_TIMEOUT}ms timeout...`);
+    
     try {
+      const result = await interaction.channel.awaitMessages({
       await interaction.channel.awaitMessages({
         filter: (msg) => {
-          // Must be from ProBot (economy bot)
-          if (msg.author.id !== ECONOMY_BOT_ID) {
-            console.log(`❌ Message from ${msg.author.username} (${msg.author.id}) - not ProBot`);
-            return false;
-          }
+          try {
+            // Must be from ProBot (economy bot)
+            if (msg.author.id !== ECONOMY_BOT_ID) {
+              console.log(`❌ Message from ${msg.author.username} (${msg.author.id}) - not ProBot`);
+              return false;
+            }
 
           console.log(`\n🤖 ═══ PROBOT MESSAGE DETECTED ═══`);
           console.log(`📅 Time: ${new Date().toISOString()}`);
@@ -357,14 +367,20 @@ module.exports = {
           
           console.log(`═════════════════════════════════════\n`);
           return isValid;
+          } catch (filterError) {
+            console.error(`❌ Error in message filter:`, filterError);
+            return false;
+          }
         },
         max: 1,
         time: PAYMENT_TIMEOUT,
         errors: ['time'],
       });
 
+      console.log(`📨 awaitMessages resolved with ${result.size} messages`);
       confirmed = true;
       console.log(`\n🎯 ✅ PAYMENT DETECTION SUCCESS! ✅`);
+      console.log(`🚀 NOW PROCEEDING TO DELIVER PRODUCT...`);
       
     } catch (error) {
       console.log(`\n❌ ⏰ PAYMENT DETECTION TIMEOUT ⏰`);
@@ -395,8 +411,13 @@ module.exports = {
       return;
     }
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      console.log(`❌ PAYMENT NOT CONFIRMED - NOT DELIVERING PRODUCT`);
+      return;
+    }
 
+    console.log(`✅ PAYMENT CONFIRMED - STARTING DELIVERY PROCESS...`);
+    
     // ── STEP 7 : Deliver item automatically ───────────────────────────────
     const finalDB   = await getDB();
     const finalItem = finalDB.data.stock.find((i) => i.id === itemChoice.id);

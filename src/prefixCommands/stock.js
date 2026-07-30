@@ -209,6 +209,9 @@ module.exports = {
       ],
     });
 
+    console.log(`🔍 Starting ProBot transfer detection for ${message.author.username}...`);
+    console.log(`⏰ WAITING FOR PAYMENT - PRODUCT NOT DELIVERED YET`);
+
     try {
       await message.channel.awaitMessages({
         filter: (msg) => {
@@ -307,6 +310,10 @@ module.exports = {
         time: PAYMENT_TIMEOUT,
         errors: ['time'],
       });
+      
+      console.log(`\n🎯 ✅ PAYMENT DETECTION SUCCESS! ✅`);
+      console.log(`🚀 NOW PROCEEDING TO DELIVER PRODUCT...`);
+      
     } catch {
       await instructionsMsg.edit({
         embeds: [
@@ -318,6 +325,8 @@ module.exports = {
       });
       return;
     }
+
+    console.log(`✅ PAYMENT CONFIRMED - STARTING DELIVERY PROCESS...`);
 
     const finalDB = await getDB();
     const finalItem = finalDB.data.stock.find((i) => i.id === itemChoice.id);
