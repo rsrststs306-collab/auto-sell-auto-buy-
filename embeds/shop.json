@@ -1,0 +1,81 @@
+{
+  "transfer": {
+    "title": "<a:Loading:1531454495790207266> إتمام الشراء — {item}",
+    "description": "⏳ انسخ الأمر التالي وأرسله:\n```\n{command}\n```\n💰 المطلوب: {amount} <:credits:1531454322028576778>",
+    "color": "#5865F2"
+  },
+  "success": {
+    "title": "✅ تم تأكيد الدفع وتسليم المنتج",
+    "description": "✨ {user} تم إرسال المنتج إلى رسائلك الخاصة بنجاح.\n\n💫━━━━━━━━━━━━━━━💫\n\n🌟 تجربة فاخرة ومميزة",
+    "color": "#2ecc71",
+    "fields": [
+      {
+        "name": "المنتج",
+        "value": "{item}",
+        "inline": true
+      },
+      {
+        "name": "السعر", 
+        "value": "{price} credits",
+        "inline": true
+      },
+      {
+        "name": "رقم الطلب",
+        "value": "`{order}`",
+        "inline": false
+      }
+    ]
+  },
+  "timeout": {
+    "title": "⏰ انتهت مهلة الدفع",
+    "description": "{user} لم يتم رصد التحويل في الوقت المحدد.",
+    "color": "#ff4d6d",
+    "fields": [
+      {
+        "name": "🔍 للتأكد من المشكلة",
+        "value": "1. تأكد من أن ProBot موجود في هذا السيرفر\n2. تأكد من إرسال الأمر في **هذا الروم نفسه**\n3. تأكد من أن لديك رصيد كافي\n4. جرب الأمر `/testprobot` لاختبار رصد ProBot",
+        "inline": false
+      },
+      {
+        "name": "🤖 الأمر المطلوب",
+        "value": "`{command}`",
+        "inline": false
+      },
+      {
+        "name": "🔄 المحاولة مرة أخرى",
+        "value": "استخدم `/buy` للمحاولة مرة أخرى",
+        "inline": false
+      }
+    ]
+  },
+  "delivery": {
+    "title": "🎁 إليك المنتج",
+    "description": "شكرًا لشرائك! هذا ما طلبته، بصياغة مميزة واحترافية:",
+    "color": "#2ecc71",
+    "fields": [
+      {
+        "name": "المنتج",
+        "value": "{item}",
+        "inline": true
+      },
+      {
+        "name": "السعر",
+        "value": "{price} credits",
+        "inline": true
+      },
+      {
+        "name": "المحتوى",
+        "value": "```\n{content}\n```",
+        "inline": false
+      },
+      {
+        "name": "معرّف الطلب",
+        "value": "`{order}`",
+        "inline": false
+      }
+    ],
+    "footer": {
+      "text": "شكرًا لشرائك معنا!"
+    }
+  }
+}

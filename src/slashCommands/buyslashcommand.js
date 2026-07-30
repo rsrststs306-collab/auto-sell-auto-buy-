@@ -10,7 +10,7 @@ const {
   ButtonStyle,
 } = require('discord.js');
 const { getDB } = require('../database');
-const { generateId, errorEmbed, COLOR, buildPremiumDescription, transferEmbed } = require('../helpers');
+const { generateId, errorEmbed, COLOR, buildPremiumDescription, transferEmbed, timeoutEmbed, deliveryEmbed, getEmbed } = require('../helpers');
 
 // How long the user has to complete each step (ms)
 const STEP_TIMEOUT   = 5 * 60 * 1000; // 5 min for menus
@@ -316,25 +316,7 @@ module.exports = {
       console.log(`Error: ${error.message}`);
       
       await instructionsMsg.edit({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(COLOR.DANGER)
-            .setTitle('⏰ انتهت مهلة الدفع')
-            .setDescription([
-              `<@${interaction.user.id}> لم يتم رصد التحويل في الوقت المحدد.`,
-              '',
-              '**🔍 للتأكد من المشكلة:**',
-              '1. تأكد من أن ProBot موجود في هذا السيرفر',
-              '2. تأكد من إرسال الأمر في **هذا الروم نفسه**',
-              '3. تأكد من أن لديك رصيد كافي',
-              '4. جرب الأمر `/testprobot` لاختبار رصد ProBot'
-            ].join('\n'))
-            .addFields(
-              { name: '🤖 الأمر المطلوب', value: `\`#credit ${SHOP_USER_ID} ${String(priceNum).replace(/[,\.]/g, '')}\``, inline: false },
-              { name: '🔄 المحاولة مرة أخرى', value: 'استخدم `/buy` للمحاولة مرة أخرى', inline: false }
-            )
-            .setTimestamp()
-        ],
+        embeds: [timeoutEmbed(interaction.user, SHOP_USER_ID, priceNum)],
         components: [], // Remove buttons when timed out
       });
       return;
@@ -371,18 +353,12 @@ module.exports = {
 
     // Update the public instructions message to show success
     await instructionsMsg.edit({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(COLOR.SUCCESS)
-          .setTitle('✅ تم تأكيد الدفع وتسليم المنتج')
-          .setDescription(buildPremiumDescription(`<@${interaction.user.id}> تم إرسال المنتج إلى رسائلك الخاصة بنجاح.`))
-          .addFields(
-            { name: 'المنتج', value: finalItem.name, inline: true },
-            { name: 'السعر', value: `${priceNum} credits`, inline: true },
-            { name: 'رقم الطلب', value: `\`${order.id}\``, inline: false },
-          )
-          .setTimestamp(),
-      ],
+      embeds: [getEmbed('shop', 'success', {
+        user: `<@${interaction.user.id}>`,
+        item: finalItem.name,
+        price: `${priceNum}`,
+        order: order.id
+      })],
       content: '',
       components: [], // Remove buttons when payment is confirmed
     });
@@ -390,20 +366,7 @@ module.exports = {
     // DM the item content to the buyer
     try {
       await interaction.user.send({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(COLOR.SUCCESS)
-            .setTitle('🎁 إليك المنتج')
-            .setDescription('شكرًا لشرائك! هذا ما طلبته، بصياغة مميزة واحترافية:')
-            .addFields(
-              { name: 'المنتج', value: finalItem.name, inline: true },
-              { name: 'السعر', value: `${priceNum} credits`, inline: true },
-              { name: 'المحتوى', value: `\`\`\`\n${deliveredContent}\n\`\`\``, inline: false },
-              { name: 'معرّف الطلب', value: `\`${order.id}\``, inline: false },
-            )
-            .setFooter({ text: 'شكرًا لشرائك معنا!' })
-            .setTimestamp(),
-        ],
+        embeds: [deliveryEmbed(finalItem, deliveredContent, order.id, priceNum, interaction.user)],
       });
     } catch {
       // DMs closed — post content in channel (only visible context, still public — warn about this)

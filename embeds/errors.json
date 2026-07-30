@@ -1,0 +1,40 @@
+{
+  "general": {
+    "title": "❌ خطأ",
+    "description": "✨ {message}\n\n💫━━━━━━━━━━━━━━━💫\n\n🌟 تجربة فاخرة ومميزة",
+    "color": "#ff4d6d",
+    "footer": {
+      "text": "يرجى المحاولة مرة أخرى أو التواصل مع الدعم في حال استمرار المشكلة."
+    }
+  },
+  "permissions": {
+    "title": "❌ صلاحيات غير كافية",
+    "description": "تحتاج إلى صلاحية **Administrator** لاستخدام هذا الأمر.",
+    "color": "#ff4d6d"
+  },
+  "not_found": {
+    "title": "❌ غير موجود",
+    "description": "{item} غير موجود.",
+    "color": "#ff4d6d"
+  },
+  "invalid_amount": {
+    "title": "❌ مبلغ غير صالح",
+    "description": "يجب أن يكون المبلغ رقمًا صالحًا أكبر من 0.",
+    "color": "#ff4d6d"
+  },
+  "out_of_stock": {
+    "title": "❌ نفد المخزون",
+    "description": "هذا المنتج نفد من المخزون.",
+    "color": "#ff4d6d"
+  },
+  "shop_not_configured": {
+    "title": "❌ المتجر غير مُجهز",
+    "description": "المتجر غير مُجهز بعد. اطلب من صاحب المتجر تعيين `SHOP_USER_ID` في إعدادات البوت.",
+    "color": "#ff4d6d"
+  },
+  "no_payment_methods": {
+    "title": "❌ لا توجد طرق دفع",
+    "description": "لا توجد طرق دفع مهيأة. تواصل مع البائع.",
+    "color": "#ff4d6d"
+  }
+}

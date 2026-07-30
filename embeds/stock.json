@@ -1,0 +1,52 @@
+{
+  "list": {
+    "title": "🛒 قائمة المنتجات والمتوفر",
+    "description": "أهلاً بك في متجر mxd market !\nالرجاء اختيار المنتج الذي ترغب في شرائه من القائمة أدناه لعرض كافة التفاصيل والسعر.",
+    "color": "#7b61ff",
+    "footer": {
+      "text": "{count} عنصر متاح حاليًا"
+    }
+  },
+  "empty": {
+    "title": "🛒 المخزون فارغ",
+    "description": "المخزون فارغ حاليًا.",
+    "color": "#ffc857"
+  },
+  "item_added": {
+    "title": "✨ تمت إضافة المنتج بنجاح",
+    "description": "أصبح هذا المنتج الآن جاهزًا للعرض والشراء.",
+    "color": "#2ecc71",
+    "fields": [
+      {
+        "name": "الاسم",
+        "value": "{name}",
+        "inline": true
+      },
+      {
+        "name": "السعر",
+        "value": "{price}",
+        "inline": true
+      },
+      {
+        "name": "المخزون",
+        "value": "{quantity} عنصرًا",
+        "inline": true
+      },
+      {
+        "name": "الوصف",
+        "value": "{description}",
+        "inline": false
+      },
+      {
+        "name": "المعرف",
+        "value": "`{id}`",
+        "inline": false
+      }
+    ]
+  },
+  "item_removed": {
+    "title": "تم حذف المنتج",
+    "description": "تم حذف المنتج ذو المعرف `{id}` من المخزون.",
+    "color": "#ff6b9a"
+  }
+}
