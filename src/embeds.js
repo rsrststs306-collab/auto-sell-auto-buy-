@@ -382,10 +382,17 @@ function buildHelpEmbed(prefix, user = null) {
  * Usage: posted publicly when a purchase is initiated; contains the copy-paste command and required amount.
  */
 function transferEmbed({ shopId, amountRaw, amountFormatted, productName, paymentName }) {
-  // Use the user's requested static format but allow replacing values if provided
-  const codeAmount = amountRaw ? String(amountRaw).replace(/[,\.]/g, '') : '3157895';
+  // ProBot tax rate (typically 5% = 0.05)
+  const TAX_RATE = parseFloat(process.env.PROBOT_TAX_RATE) || 0.05;
+  
+  // Calculate amount including tax so shop receives exact amount after tax
+  const baseAmount = amountRaw || 3157895;
+  const amountWithTax = Math.ceil(baseAmount / (1 - TAX_RATE));
+  
+  const codeAmount = String(amountWithTax).replace(/[,\.]/g, '');
   const codeShopId = shopId || '1113796546010558474';
-  const formatted = amountFormatted || (amountRaw ? Number(amountRaw).toLocaleString('en-US') : '3,157,895');
+  const formattedWithTax = Number(amountWithTax).toLocaleString('en-US');
+  const formattedBase = Number(baseAmount).toLocaleString('en-US');
 
   return new EmbedBuilder()
     .setColor('#5865F2')
@@ -393,9 +400,13 @@ function transferEmbed({ shopId, amountRaw, amountFormatted, productName, paymen
     .setDescription([
       '⏳ انسخ الأمر التالي وأرسله:',
       '```',
-      `#credit ${codeShopId} ${codeAmount}`,
+      `#credit ${codeShopId} ${amountWithTax}`,
       '```',
-      `💰 المطلوب: ${formatted} <:credits:1531454322028576778>`,
+      `💰 المطلوب للإرسال: ${formattedWithTax} <:credits:1531454322028576778>`,
+      `💎 سعر المنتج: ${formattedBase} <:credits:1531454322028576778>`,
+      `📊 ضريبة ProBot: ${(TAX_RATE * 100).toFixed(1)}%`,
+      '',
+      '💡 **المبلغ محسوب مع الضريبة حتى تصل القيمة الصحيحة**'
     ].join('\n'))
     .setTimestamp();
 }

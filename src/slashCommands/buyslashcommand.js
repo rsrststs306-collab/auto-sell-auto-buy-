@@ -184,6 +184,10 @@ module.exports = {
     // ── STEP 5 : Post PUBLIC transfer instruction message ─────────────────
     // Parse the numeric amount from the price string (e.g. "500 credits" → 500, "$5" → 5)
     const priceNum = parseFloat(itemChoice.price.replace(/[^0-9.]/g, ''));
+    
+    // Calculate amount with ProBot tax so shop receives exact price after tax deduction
+    const TAX_RATE = parseFloat(process.env.PROBOT_TAX_RATE) || 0.05;
+    const amountWithTax = Math.ceil(priceNum / (1 - TAX_RATE));
 
     // Create command copy button with simpler ID
     const buttonId = `copy_command_${interaction.user.id}`;
@@ -203,7 +207,7 @@ module.exports = {
       embeds: [
         transferEmbed({
           shopId: SHOP_USER_ID,
-          amountRaw: priceNum,
+          amountRaw: priceNum,  // Pass the base price, transferEmbed will calculate tax
           amountFormatted: Number(priceNum).toLocaleString('en-US'),
           productName: itemChoice.name,
           paymentName: payChoice.name,
@@ -279,26 +283,33 @@ module.exports = {
           }
 
           console.log(`🔤 Full Combined Text: "${allText}"`);
-          console.log(`🎯 Expected price: ${priceNum}`);
+          console.log(`🎯 Expected price: ${priceNum} (base) | ${amountWithTax} (with tax)`);
           
           // Simple number extraction
           const textNumbers = allText.replace(/[^\d]/g, '');
           const expectedAmount = String(priceNum).replace(/[^\d]/g, '');
+          const expectedWithTax = String(amountWithTax).replace(/[^\d]/g, '');
           
           console.log(`🔢 Extracted Numbers: "${textNumbers}"`);
-          console.log(`🎯 Expected Amount: "${expectedAmount}"`);
+          console.log(`🎯 Expected Amount: "${expectedAmount}" (base) or "${expectedWithTax}" (with tax)`);
 
           // Check if the expected amount appears in the text (more flexible matching)
           let hasAmount = false;
           
-          // Try multiple amount formats
+          // Try multiple amount formats for both base price and amount with tax
           const amountVariations = [
-            String(priceNum),                    // Original: "1"
-            priceNum.toString(),                 // "1"
-            expectedAmount,                      // "1"
-            `$${priceNum}`,                      // "$1"
-            priceNum * 1000,                     // For k format: 1000
-            priceNum * 1000000,                  // For M format: 1000000
+            String(priceNum),                    // Original base price
+            String(amountWithTax),               // Amount with tax
+            priceNum.toString(),                 
+            amountWithTax.toString(),
+            expectedAmount,                      
+            expectedWithTax,
+            `$${priceNum}`,                      
+            `$${amountWithTax}`,
+            priceNum * 1000,                     
+            amountWithTax * 1000,
+            priceNum * 1000000,                  
+            amountWithTax * 1000000,
           ];
           
           console.log(`🔍 Checking amount variations:`, amountVariations);

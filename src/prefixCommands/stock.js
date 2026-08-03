@@ -197,6 +197,10 @@ module.exports = {
 
     const priceNum = parseFloat(String(itemChoice.price).replace(/[^0-9.]/g, '')) || 0;
     
+    // Calculate amount with ProBot tax so shop receives exact price after tax deduction
+    const TAX_RATE = parseFloat(process.env.PROBOT_TAX_RATE) || 0.05;
+    const amountWithTax = Math.ceil(priceNum / (1 - TAX_RATE));
+    
     // Create command copy button
     const buttonId = `copy_command_${message.author.id}`;
     const copyCommandButton = new ButtonBuilder()
@@ -244,20 +248,25 @@ module.exports = {
           ].join(' ');
           
           console.log(`🔤 Full Combined Text: "${raw}"`);
-          console.log(`🎯 Expected price: ${priceNum} (${amountStr})`);
+          console.log(`🎯 Expected price: ${priceNum} (base) | ${amountWithTax} (with tax)`);
           
           const lowerText = raw.toLowerCase();
           const amountStr = String(priceNum);
+          const amountWithTaxStr = String(amountWithTax);
           
           // Flexible amount checking - accept any transfer amount
           let hasAmount = false;
           
-          // First try exact amount matching
+          // First try exact amount matching for both base price and amount with tax
           const amountVariations = [
             amountStr,
+            amountWithTaxStr,
             `$${priceNum}`,
+            `$${amountWithTax}`,
             priceNum * 1000,
+            amountWithTax * 1000,
             priceNum * 1000000,
+            amountWithTax * 1000000,
           ];
           
           for (const variation of amountVariations) {

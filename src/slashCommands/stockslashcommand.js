@@ -199,6 +199,10 @@ module.exports = {
 
     const priceNum = parseFloat(String(itemChoice.price).replace(/[^0-9.]/g, '')) || 0;
     
+    // Calculate amount with ProBot tax so shop receives exact price after tax deduction
+    const TAX_RATE = parseFloat(process.env.PROBOT_TAX_RATE) || 0.05;
+    const amountWithTax = Math.ceil(priceNum / (1 - TAX_RATE));
+    
     // Create command copy button
     const buttonId = `copy_command_${interaction.user.id}`;
     const copyCommandButton = new ButtonBuilder()
@@ -214,7 +218,7 @@ module.exports = {
       embeds: [
         transferEmbed({
           shopId: SHOP_USER_ID,
-          amountRaw: priceNum,
+          amountRaw: priceNum,  // Pass base price, transferEmbed will calculate tax
           amountFormatted: priceNum.toLocaleString('en-US'),
           productName: itemChoice.name,
           paymentName: payChoice.name
