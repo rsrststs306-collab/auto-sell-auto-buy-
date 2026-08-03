@@ -279,6 +279,7 @@ module.exports = {
           }
 
           console.log(`🔤 Full Combined Text: "${allText}"`);
+          console.log(`🎯 Expected price: ${priceNum}`);
           
           // Simple number extraction
           const textNumbers = allText.replace(/[^\d]/g, '');
@@ -312,7 +313,15 @@ module.exports = {
           }
           
           // Only accept if we have transfer words AND proper amount
-          // Don't accept just any numbers!
+          // Check for any monetary amount if exact match fails
+          if (!hasAmount) {
+            // Check if there's any monetary amount in the message
+            const moneyPattern = /\$[\d,]+|\d+\s*credit/i;
+            if (moneyPattern.test(allText)) {
+              hasAmount = true;
+              console.log(`✅ Found valid transfer amount in message`);
+            }
+          }
           
           // Check for user ID (most reliable) - handle both <@userid> and <@!userid> formats
           const hasUser = (

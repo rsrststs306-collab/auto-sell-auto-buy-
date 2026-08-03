@@ -244,12 +244,15 @@ module.exports = {
           ].join(' ');
           
           console.log(`🔤 Full Combined Text: "${raw}"`);
+          console.log(`🎯 Expected price: ${priceNum} (${amountStr})`);
           
           const lowerText = raw.toLowerCase();
           const amountStr = String(priceNum);
           
-          // Flexible amount checking
+          // Flexible amount checking - accept any transfer amount
           let hasAmount = false;
+          
+          // First try exact amount matching
           const amountVariations = [
             amountStr,
             `$${priceNum}`,
@@ -260,12 +263,21 @@ module.exports = {
           for (const variation of amountVariations) {
             if (raw.includes(String(variation))) {
               hasAmount = true;
-              console.log(`✅ Found amount variation: ${variation}`);
+              console.log(`✅ Found exact amount variation: ${variation}`);
               break;
             }
           }
           
-          // Don't accept just any amount - be stricter
+          // If no exact match, accept any valid transfer amount 
+          // (since users may overpay, pay in different currency, etc.)
+          if (!hasAmount) {
+            // Check if there's any monetary amount in the message
+            const moneyPattern = /\$[\d,]+|\d+\s*credit/i;
+            if (moneyPattern.test(raw)) {
+              hasAmount = true;
+              console.log(`✅ Found valid transfer amount in message`);
+            }
+          }
           
           // Improved user detection (handle mention formats)
           const hasBuyer = (
