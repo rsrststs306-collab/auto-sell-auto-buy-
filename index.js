@@ -180,7 +180,7 @@ client.on('interactionCreate', async (interaction) => {
       return await handleGuildControlButton(interaction, client);
     }
 
-    if (interaction.guild && await isGuildDisabled(interaction.guild.id)) {
+    if (interaction.guild && await isGuildDisabled(interaction.guild.id).catch(() => false)) {
       if (interaction.isRepliable()) {
         return await interaction.reply({
           embeds: [errorEmbed('The bot is disabled in this server.')],
@@ -299,7 +299,7 @@ client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(PREFIX)) return;
 
-  if (message.guild && await isGuildDisabled(message.guild.id)) return;
+  if (message.guild && await isGuildDisabled(message.guild.id).catch(() => false)) return;
 
   const args    = message.content.slice(PREFIX.length).trim().split(/\s+/);
   const cmdName = args.shift().toLowerCase();

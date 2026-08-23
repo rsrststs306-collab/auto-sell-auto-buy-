@@ -1,0 +1,14 @@
+{
+  "stock": [],
+  "payments": [],
+  "orders": [],
+  "disabledGuilds": [],
+  "feedbackChannelId": "",
+  "config": {
+    "roles": {},
+    "channels": {},
+    "categories": {},
+    "shop": {},
+    "probot": {}
+  }
+}

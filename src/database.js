@@ -15,7 +15,8 @@ const defaultData = {
     roles: {},
     channels: {},
     categories: {},
-    shop: {}
+    shop: {},
+    probot: {}
   }
 };
 
@@ -27,7 +28,23 @@ class JSONDatabase {
   async load() {
     try {
       const fileContent = await fs.readFile(DB_PATH, 'utf8');
-      this.data = JSON.parse(fileContent);
+      
+      // Check if file is empty or contains only whitespace
+      if (!fileContent || fileContent.trim() === '') {
+        console.log('Database file is empty, creating with default data...');
+        this.data = { ...defaultData };
+        await this.write();
+        return;
+      }
+      
+      try {
+        this.data = JSON.parse(fileContent);
+      } catch (parseError) {
+        console.error('JSON parsing error, reinitializing database:', parseError.message);
+        this.data = { ...defaultData };
+        await this.write();
+        return;
+      }
       
       // Ensure all required properties exist
       this.data = { ...defaultData, ...this.data };
@@ -35,6 +52,9 @@ class JSONDatabase {
       // Ensure nested objects exist
       if (!this.data.config) this.data.config = {};
       this.data.config = { ...defaultData.config, ...this.data.config };
+      
+      // Ensure probot config exists
+      if (!this.data.config.probot) this.data.config.probot = {};
       
     } catch (error) {
       if (error.code === 'ENOENT') {
@@ -44,7 +64,9 @@ class JSONDatabase {
         await this.write();
       } else {
         console.error('Error loading database:', error);
-        throw error;
+        console.log('Reinitializing with default data...');
+        this.data = { ...defaultData };
+        await this.write();
       }
     }
   }

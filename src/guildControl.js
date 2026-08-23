@@ -77,18 +77,28 @@ async function getLogChannel(client) {
 }
 
 async function isGuildDisabled(guildId) {
-  const db = await getDB();
-  return Array.isArray(db.data.disabledGuilds) && db.data.disabledGuilds.includes(guildId);
+  try {
+    const db = await getDB();
+    return Array.isArray(db.data?.disabledGuilds) && db.data.disabledGuilds.includes(guildId);
+  } catch (error) {
+    console.error('Error checking if guild is disabled:', error);
+    return false; // Default to enabled if we can't check
+  }
 }
 
 async function setGuildDisabled(guildId, disabled) {
-  const db = await getDB();
-  if (!Array.isArray(db.data.disabledGuilds)) db.data.disabledGuilds = [];
+  try {
+    const db = await getDB();
+    if (!Array.isArray(db.data.disabledGuilds)) db.data.disabledGuilds = [];
 
-  db.data.disabledGuilds = disabled
-    ? [...new Set([...db.data.disabledGuilds, guildId])]
-    : db.data.disabledGuilds.filter((id) => id !== guildId);
-  await db.write();
+    db.data.disabledGuilds = disabled
+      ? [...new Set([...db.data.disabledGuilds, guildId])]
+      : db.data.disabledGuilds.filter((id) => id !== guildId);
+    await db.write();
+  } catch (error) {
+    console.error('Error setting guild disabled status:', error);
+    throw error; // Re-throw so caller knows it failed
+  }
 }
 
 async function handleGuildCreate(client, guild) {

@@ -7,13 +7,27 @@ const PROBOT_GUILD_ID = process.env.PROBOT_GUILD_ID;
 const PROBOT_API_BASE = 'https://probot.io/api';
 
 /**
+ * Get ProBot ID from database configuration
+ * @returns {Promise<string|null>} ProBot ID or null if not configured
+ */
+async function getProbotId() {
+  try {
+    const db = await getDB();
+    return db.data?.config?.probot?.id || null;
+  } catch (error) {
+    console.error('Error getting ProBot ID from database:', error);
+    return null;
+  }
+}
+
+/**
  * Check if a message is from ProBot based on stored configuration
  * @param {Message} message - Discord message object
  * @returns {Promise<boolean>} True if message is from configured ProBot
  */
 async function isMessageFromProbot(message) {
   try {
-    if (!message.author || message.author.bot !== true) {
+    if (!message || !message.author || message.author.bot !== true) {
       return false;
     }
     
@@ -28,21 +42,9 @@ async function isMessageFromProbot(message) {
     return message.author.id === probotId;
   } catch (error) {
     console.error('Error checking if message is from ProBot:', error);
-    return false;
-  }
-}
-
-/**
- * Get ProBot ID from database configuration
- * @returns {Promise<string|null>} ProBot ID or null if not configured
- */
-async function getProbotId() {
-  try {
-    const db = await getDB();
-    return db.data.config.probot?.id || null;
-  } catch (error) {
-    console.error('Error getting ProBot ID from database:', error);
-    return null;
+    // Fallback to default ProBot ID on error
+    const defaultProbotId = '282859044593598464';
+    return message?.author?.id === defaultProbotId;
   }
 }
 
