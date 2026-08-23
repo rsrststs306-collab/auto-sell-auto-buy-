@@ -1,9 +1,50 @@
 const https = require('https');
+const { getDB } = require('./database');
 
 // ProBot API configuration
 const PROBOT_API_TOKEN = process.env.PROBOT_API_TOKEN;
 const PROBOT_GUILD_ID = process.env.PROBOT_GUILD_ID;
 const PROBOT_API_BASE = 'https://probot.io/api';
+
+/**
+ * Check if a message is from ProBot based on stored configuration
+ * @param {Message} message - Discord message object
+ * @returns {Promise<boolean>} True if message is from configured ProBot
+ */
+async function isMessageFromProbot(message) {
+  try {
+    if (!message.author || message.author.bot !== true) {
+      return false;
+    }
+    
+    const probotId = await getProbotId();
+    if (!probotId) {
+      // Fallback to default ProBot ID if not configured
+      const defaultProbotId = '282859044593598464';
+      console.warn('ProBot ID not configured, using default:', defaultProbotId);
+      return message.author.id === defaultProbotId;
+    }
+    
+    return message.author.id === probotId;
+  } catch (error) {
+    console.error('Error checking if message is from ProBot:', error);
+    return false;
+  }
+}
+
+/**
+ * Get ProBot ID from database configuration
+ * @returns {Promise<string|null>} ProBot ID or null if not configured
+ */
+async function getProbotId() {
+  try {
+    const db = await getDB();
+    return db.data.config.probot?.id || null;
+  } catch (error) {
+    console.error('Error getting ProBot ID from database:', error);
+    return null;
+  }
+}
 
 /**
  * Make API request to ProBot
@@ -212,5 +253,7 @@ module.exports = {
   getUserTransactions,
   checkTransfer,
   monitorTransfer,
-  testConnection
+  testConnection,
+  getProbotId,
+  isMessageFromProbot
 };

@@ -248,8 +248,11 @@ client.on('interactionCreate', async (interaction) => {
 
 // ── Prefix commands ───────────────────────────────────────────────────────
 client.on('messageCreate', async (message) => {
+  // Import ProBot helper function
+  const { isMessageFromProbot } = require('./src/probotAPI');
+  
   // Enhanced ProBot message logging for debugging
-  if (message.author.id === process.env.ECONOMY_BOT_ID || message.author.id === '567703512763334685') {
+  if (await isMessageFromProbot(message)) {
     console.log('\n🔍 ═══ PROBOT MESSAGE DETECTED ═══');
     console.log(`📅 Time: ${new Date().toISOString()}`);
     console.log(`📍 Channel: ${message.channel.name} (${message.channel.id})`);

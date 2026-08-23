@@ -14,7 +14,7 @@ const { buildStockEmbed, errorEmbed, COLOR, getStockItemEmoji, generateId, build
 
 const STEP_TIMEOUT = 5 * 60 * 1000;
 const PAYMENT_TIMEOUT = 10 * 60 * 1000;
-const ECONOMY_BOT_ID = process.env.ECONOMY_BOT_ID || '567703512763334685';
+const { isMessageFromProbot } = require('../probotAPI');
 const SHOP_USER_ID = process.env.SHOP_USER_ID || '';
 
 module.exports = {
@@ -229,8 +229,8 @@ module.exports = {
 
     try {
       await interaction.channel.awaitMessages({
-        filter: (msg) => {
-          if (msg.author.id !== ECONOMY_BOT_ID) return false;
+        filter: async (msg) => {
+          if (!(await isMessageFromProbot(msg))) return false;
           const raw = [
             msg.content,
             ...msg.embeds.flatMap((e) => [

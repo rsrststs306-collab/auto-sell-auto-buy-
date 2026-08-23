@@ -362,6 +362,15 @@ function buildHelpEmbed(prefix, user = null) {
         ].join('\n'),
       },
       {
+        name: '🤖 ProBot Configuration',
+        value: [
+          `\`${prefix}probotid get\` / \`/probotid get\` — View current ProBot ID`,
+          `\`${prefix}probotid set <id>\` / \`/probotid set\` — Set ProBot ID`,
+          `\`${prefix}probotid remove\` / \`/probotid remove\` — Remove ProBot ID`,
+          `\`/probotid info\` — Guide on how to get ProBot ID`,
+        ].join('\n'),
+      },
+      {
         name: '🛡️ Moderation',
         value: [
           `\`${prefix}say <message>\` / \`/say\` — Make the bot send a message`,

@@ -1,8 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { errorEmbed, successEmbed, COLOR } = require('../helpers');
-
-// ProBot's bot user ID
-const ECONOMY_BOT_ID = process.env.ECONOMY_BOT_ID || '567703512763334685';
+const { getProbotId, isMessageFromProbot } = require('../probotAPI');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -19,6 +17,10 @@ module.exports = {
 
   async execute(interaction) {
     const timeout = (interaction.options.getInteger('timeout') || 60) * 1000;
+    
+    // Get current ProBot ID
+    const currentProbotId = await getProbotId();
+    const displayId = currentProbotId || '282859044593598464 (افتراضي)';
 
     await interaction.reply({
       embeds: [
@@ -32,8 +34,9 @@ module.exports = {
             '📨 قم بإرسال أي أمر للبروبوت (مثل `#credits` أو `#daily`)',
             '⏰ المهلة الزمنية: ' + (timeout / 1000) + ' ثانية',
             '',
-            '🤖 **ProBot ID المتوقع:** ' + ECONOMY_BOT_ID
-          ].join('\n'))
+            `🤖 **ProBot ID المتوقع:** ${displayId}`,
+            currentProbotId ? '' : '\n⚠️ **تحذير:** لم يتم تعيين معرف ProBot. استخدم `/probotid set` لتعيينه.'
+          ].filter(Boolean).join('\n'))
           .setTimestamp()
       ],
       flags: MessageFlags.Ephemeral
@@ -42,15 +45,17 @@ module.exports = {
     console.log('\n🔍 ═══ PROBOT TEST MODE ACTIVATED ═══');
     console.log(`⏰ Waiting for ProBot message for ${timeout/1000} seconds...`);
     console.log(`🎯 Monitoring channel: ${interaction.channel.name} (${interaction.channel.id})`);
-    console.log(`🤖 Expected ProBot ID: ${ECONOMY_BOT_ID}`);
+    console.log(`🤖 Expected ProBot ID: ${currentProbotId || 'Not configured (using default)'}`);
 
     try {
       const message = await interaction.channel.awaitMessages({
-        filter: (msg) => {
+        filter: async (msg) => {
           console.log(`\n📨 Message from: ${msg.author.username} (${msg.author.id})`);
-          console.log(`🤖 Is ProBot? ${msg.author.id === ECONOMY_BOT_ID ? '✅ YES' : '❌ NO'}`);
           
-          if (msg.author.id === ECONOMY_BOT_ID) {
+          const isProBot = await isMessageFromProbot(msg);
+          console.log(`🤖 Is ProBot? ${isProBot ? '✅ YES' : '❌ NO'}`);
+          
+          if (isProBot) {
             console.log('🎉 PROBOT MESSAGE CAPTURED!');
             return true;
           }
